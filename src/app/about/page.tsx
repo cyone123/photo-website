@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "关于 · 光的档案",
+  title: "关于",
   description: "关于这个个人照片档案项目。",
 };
 

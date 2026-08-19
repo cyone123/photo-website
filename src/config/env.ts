@@ -18,6 +18,7 @@ const serverEnvSchema = z.object({
   R2_PUBLIC_BUCKET: optionalNonEmptyString,
   R2_PRIVATE_BUCKET: optionalNonEmptyString,
   R2_PUBLIC_BASE_URL: optionalUrl,
+  REVALIDATE_SECRET: optionalNonEmptyString,
 });
 
 const importEnvSchema = serverEnvSchema.extend({
@@ -27,6 +28,7 @@ const importEnvSchema = serverEnvSchema.extend({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_PUBLIC_BUCKET: z.string().min(1),
   R2_PRIVATE_BUCKET: z.string().min(1),
+  SITE_REVALIDATE_URL: optionalUrl,
 });
 
 export function readServerEnv() {

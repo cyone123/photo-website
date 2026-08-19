@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,10 +5,9 @@ import { AlbumCard } from "@/components/album-card";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoGrid } from "@/components/photo-grid";
 import { PhotoPlaceholder } from "@/components/photo-placeholder";
+import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { SectionHeading } from "@/components/section-heading";
-import { formatPhotoYear, getLatestPhotos, getPublishedAlbums } from "@/lib/gallery";
-
-export const dynamic = "force-dynamic";
+import { formatPhotoYear, getLatestPhotos, getPublishedAlbumSummaries } from "@/lib/gallery";
 
 export const metadata: Metadata = {
   title: "光的档案 · Personal Photo Archive",
@@ -17,7 +15,10 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const [albums, latestPhotos] = await Promise.all([getPublishedAlbums(), getLatestPhotos(9)]);
+  const [albums, latestPhotos] = await Promise.all([
+    getPublishedAlbumSummaries(6),
+    getLatestPhotos(9),
+  ]);
   const featuredAlbum = albums[0];
   const featuredPhoto = featuredAlbum?.coverPhoto ?? latestPhotos[0] ?? null;
   const featuredHref = featuredAlbum
@@ -39,10 +40,13 @@ export default async function Home() {
             style={{ "--hero-ratio": String(heroRatio) } as CSSProperties}
           >
             {featuredPhoto?.detailUrl ? (
-              <img
-                src={featuredPhoto.detailUrl}
+              <ResponsivePhotoImage
+                photo={featuredPhoto}
                 alt={featuredPhoto.title ?? "精选照片"}
-                decoding="async"
+                sizes="100vw"
+                preferredWidth={1600}
+                loading="eager"
+                fetchPriority="high"
               />
             ) : (
               <PhotoPlaceholder index={0} />
@@ -54,8 +58,7 @@ export default async function Home() {
               <h1>{featuredAlbum?.title ?? featuredPhoto?.title ?? "光的档案"}</h1>
               {featuredAlbum ? (
                 <span className="hero-band-meta">
-                  {featuredAlbum.photos.length} 张照片 ·{" "}
-                  {formatPhotoYear(featuredAlbum.publishedAt)}
+                  {featuredAlbum.photoCount} 张照片 · {formatPhotoYear(featuredAlbum.publishedAt)}
                 </span>
               ) : null}
             </div>
@@ -75,7 +78,7 @@ export default async function Home() {
           <SectionHeading label="01 / Albums" title="相册" href="/albums" />
           {albums.length > 0 ? (
             <div className="album-grid">
-              {albums.slice(0, 6).map((album, index) => (
+              {albums.map((album, index) => (
                 <AlbumCard key={album.id} album={album} index={index} />
               ))}
             </div>

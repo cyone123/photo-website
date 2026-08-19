@@ -1,7 +1,17 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { readServerEnv } from "@/config/env";
 import { getDb } from "@/db/client";
 import { albumPhotos, albums, photos } from "@/db/schema";
+
+export const GALLERY_CACHE_TAG = "gallery";
+
+const GALLERY_CACHE_OPTIONS = {
+  tags: [GALLERY_CACHE_TAG],
+  revalidate: 3600,
+};
+
+export type GalleryDate = Date | string | null;
 
 export interface GalleryVariant {
   width: number;
@@ -18,7 +28,7 @@ export interface GalleryPhoto {
   aspectRatio: number;
   title: string | null;
   description: string | null;
-  takenAt: Date | null;
+  takenAt: GalleryDate;
   cameraMake: string | null;
   cameraModel: string | null;
   lensModel: string | null;
@@ -39,8 +49,18 @@ export interface GalleryAlbum {
   slug: string;
   title: string;
   description: string | null;
-  publishedAt: Date | null;
+  publishedAt: GalleryDate;
   photos: GalleryPhoto[];
+  coverPhoto: GalleryPhoto | null;
+}
+
+export interface GalleryAlbumSummary {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  publishedAt: GalleryDate;
+  photoCount: number;
   coverPhoto: GalleryPhoto | null;
 }
 
@@ -127,10 +147,9 @@ function toGalleryPhoto(
   };
 }
 
-async function queryPublishedAlbums() {
-  return getDb().query.albums.findMany({
-    where: eq(albums.status, "PUBLISHED"),
-    orderBy: [desc(albums.publishedAt), desc(albums.createdAt)],
+async function queryPublishedAlbumBySlug(slug: string) {
+  return getDb().query.albums.findFirst({
+    where: and(eq(albums.slug, slug), eq(albums.status, "PUBLISHED")),
     with: {
       albumPhotos: {
         orderBy: [asc(albumPhotos.sortOrder)],
@@ -146,7 +165,7 @@ async function queryPublishedAlbums() {
   });
 }
 
-type RawAlbum = Awaited<ReturnType<typeof queryPublishedAlbums>>[number];
+type RawAlbum = NonNullable<Awaited<ReturnType<typeof queryPublishedAlbumBySlug>>>;
 type RawAlbumPhoto = RawAlbum["albumPhotos"][number];
 type RawPhoto = NonNullable<RawAlbumPhoto["photo"]>;
 
@@ -173,36 +192,73 @@ function toGalleryAlbum(album: RawAlbum): GalleryAlbum {
   };
 }
 
-export async function getPublishedAlbums() {
-  try {
-    return (await queryPublishedAlbums()).map(toGalleryAlbum);
-  } catch {
-    return [];
-  }
+async function queryPublishedAlbumSummaries(limit?: number): Promise<GalleryAlbumSummary[]> {
+  const db = getDb();
+  const baseQuery = db
+    .select({
+      id: albums.id,
+      slug: albums.slug,
+      title: albums.title,
+      description: albums.description,
+      publishedAt: albums.publishedAt,
+      createdAt: albums.createdAt,
+      coverPhotoId: albums.coverPhotoId,
+      photoCount: count(photos.id).mapWith(Number),
+    })
+    .from(albums)
+    .leftJoin(albumPhotos, eq(albumPhotos.albumId, albums.id))
+    .leftJoin(photos, and(eq(photos.id, albumPhotos.photoId), eq(photos.status, "READY")))
+    .where(eq(albums.status, "PUBLISHED"))
+    .groupBy(albums.id)
+    .orderBy(desc(albums.publishedAt), desc(albums.createdAt));
+  const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
+  const coverPhotoIds = [
+    ...new Set(rows.flatMap((album) => (album.coverPhotoId ? [album.coverPhotoId] : []))),
+  ];
+  const coverPhotos =
+    coverPhotoIds.length > 0
+      ? await db.query.photos.findMany({
+          where: and(inArray(photos.id, coverPhotoIds), eq(photos.status, "READY")),
+          with: { variants: true },
+        })
+      : [];
+  const coverPhotoById = new Map(
+    coverPhotos.map((photo) => [photo.id, toGalleryPhoto(photo as RawPhoto)]),
+  );
+
+  return rows.map((album) => ({
+    id: album.id,
+    slug: album.slug,
+    title: album.title,
+    description: album.description,
+    publishedAt: album.publishedAt,
+    photoCount: album.photoCount,
+    coverPhoto: album.coverPhotoId ? (coverPhotoById.get(album.coverPhotoId) ?? null) : null,
+  }));
 }
 
-export async function getAlbumBySlug(slug: string) {
-  try {
-    const album = await getDb().query.albums.findFirst({
-      where: and(eq(albums.slug, slug), eq(albums.status, "PUBLISHED")),
-      with: {
-        albumPhotos: {
-          orderBy: [asc(albumPhotos.sortOrder)],
-          with: {
-            photo: {
-              with: {
-                variants: true,
-              },
-            },
-          },
-        },
-      },
-    });
+const getCachedPublishedAlbumSummaries = unstable_cache(
+  queryPublishedAlbumSummaries,
+  ["published-album-summaries"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getPublishedAlbumSummaries(limit?: number) {
+  return getCachedPublishedAlbumSummaries(limit);
+}
+
+const getCachedAlbumBySlug = unstable_cache(
+  async (slug: string) => {
+    const album = await queryPublishedAlbumBySlug(slug);
 
     return album ? toGalleryAlbum(album as RawAlbum) : null;
-  } catch {
-    return null;
-  }
+  },
+  ["published-album-by-slug"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getAlbumBySlug(slug: string) {
+  return getCachedAlbumBySlug(slug);
 }
 
 async function queryLatestPhotos(limit: number) {
@@ -216,17 +272,21 @@ async function queryLatestPhotos(limit: number) {
   });
 }
 
-export async function getLatestPhotos(limit = 6) {
-  try {
+const getCachedLatestPhotos = unstable_cache(
+  async (limit: number) => {
     const latest = await queryLatestPhotos(limit);
     return latest.map((photo) => toGalleryPhoto(photo as RawPhoto));
-  } catch {
-    return [];
-  }
+  },
+  ["latest-photos"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getLatestPhotos(limit = 6) {
+  return getCachedLatestPhotos(limit);
 }
 
-export async function getPhotoById(id: string) {
-  try {
+const getCachedPhotoById = unstable_cache(
+  async (id: string) => {
     const photo = await getDb().query.photos.findFirst({
       where: and(eq(photos.id, id), eq(photos.status, "READY")),
       with: {
@@ -252,12 +312,27 @@ export async function getPhotoById(id: string) {
     });
 
     return toGalleryPhoto(photo as RawPhoto, publishedAlbums);
-  } catch {
-    return null;
-  }
+  },
+  ["ready-photo-by-id"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getPhotoById(id: string) {
+  return getCachedPhotoById(id);
 }
 
-export function formatPhotoDate(date: Date | null) {
+function asDate(value: GalleryDate) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatPhotoDate(value: GalleryDate) {
+  const date = asDate(value);
+
   if (!date) {
     return "未记录日期";
   }
@@ -269,6 +344,7 @@ export function formatPhotoDate(date: Date | null) {
   }).format(date);
 }
 
-export function formatPhotoYear(date: Date | null) {
+export function formatPhotoYear(value: GalleryDate) {
+  const date = asDate(value);
   return date ? new Intl.DateTimeFormat("zh-CN", { year: "numeric" }).format(date) : "—";
 }

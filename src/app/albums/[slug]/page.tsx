@@ -5,8 +5,6 @@ import { EmptyState } from "@/components/empty-state";
 import { PhotoGrid } from "@/components/photo-grid";
 import { formatPhotoYear, getAlbumBySlug } from "@/lib/gallery";
 
-export const dynamic = "force-dynamic";
-
 type AlbumPageProps = {
   params: Promise<{ slug: string }>;
 };
@@ -16,7 +14,7 @@ export async function generateMetadata({ params }: AlbumPageProps): Promise<Meta
   const album = await getAlbumBySlug(slug);
 
   return {
-    title: album ? `${album.title} · 光的档案` : "相册 · 光的档案",
+    title: album?.title ?? "相册",
     description: album?.description ?? "个人照片相册。",
   };
 }

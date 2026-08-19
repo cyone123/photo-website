@@ -4,6 +4,7 @@ import { loadProjectEnv } from "@/config/load-env";
 import { collectImageFiles } from "@/importer/file-utils";
 import { dryRunPhotoImport, importPhoto } from "@/importer/import-photo";
 import { inspectImage } from "@/importer/inspect-image";
+import { revalidatePublishedGallery } from "@/importer/revalidate-site";
 
 function printHelp() {
   console.log(`Photo Website CLI
@@ -154,6 +155,18 @@ async function runImport(args: string[]) {
   }
 
   console.log(`Summary: ${imported} imported, ${skipped} skipped, ${failed} failed.`);
+
+  if (!parsed.dryRun && imported + skipped > 0) {
+    try {
+      const revalidation = await revalidatePublishedGallery();
+
+      if (revalidation.status === "revalidated") {
+        console.log("[cache]     Gallery cache revalidated.");
+      }
+    } catch (error) {
+      console.warn(`[cache]     ${formatError(error)} The hourly fallback remains active.`);
+    }
+  }
 
   if (failed > 0) {
     process.exitCode = 1;

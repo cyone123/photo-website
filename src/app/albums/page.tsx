@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import { AlbumCard } from "@/components/album-card";
 import { EmptyState } from "@/components/empty-state";
-import { getPublishedAlbums } from "@/lib/gallery";
-
-export const dynamic = "force-dynamic";
+import { getPublishedAlbumSummaries } from "@/lib/gallery";
 
 export const metadata: Metadata = {
-  title: "相册 · 光的档案",
+  title: "相册",
   description: "按时间和主题整理的个人照片相册。",
 };
 
 export default async function AlbumsPage() {
-  const albums = await getPublishedAlbums();
+  const albums = await getPublishedAlbumSummaries();
 
   return (
     <main className="page-frame page-frame-main">

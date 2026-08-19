@@ -1,13 +1,11 @@
-/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { PhotoDetails } from "@/components/photo-details";
 import { PhotoPlaceholder } from "@/components/photo-placeholder";
+import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { getPhotoById } from "@/lib/gallery";
-
-export const dynamic = "force-dynamic";
 
 type PhotoPageProps = {
   params: Promise<{ id: string }>;
@@ -18,7 +16,7 @@ export async function generateMetadata({ params }: PhotoPageProps): Promise<Meta
   const photo = await getPhotoById(id);
 
   return {
-    title: photo ? `${photo.title ?? "照片"} · 光的档案` : "照片 · 光的档案",
+    title: photo?.title ?? "照片",
     description: photo?.description ?? "个人照片档案。",
   };
 }
@@ -46,7 +44,14 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
 
       <figure className="photo-stage">
         {photo.detailUrl ? (
-          <img src={photo.detailUrl} alt={photo.title ?? "相册照片"} decoding="async" />
+          <ResponsivePhotoImage
+            photo={photo}
+            alt={photo.title ?? "相册照片"}
+            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1488px) calc(100vw - 48px), 1440px"
+            preferredWidth={1600}
+            loading="eager"
+            fetchPriority="high"
+          />
         ) : (
           <PhotoPlaceholder index={Number.parseInt(photo.id.slice(0, 2), 16) || 0} />
         )}

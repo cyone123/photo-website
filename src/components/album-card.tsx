@@ -1,19 +1,20 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import type { GalleryAlbum } from "@/lib/gallery";
+import type { GalleryAlbumSummary } from "@/lib/gallery";
 import { formatPhotoYear } from "@/lib/gallery";
 import { PhotoPlaceholder } from "./photo-placeholder";
+import { ResponsivePhotoImage } from "./responsive-photo-image";
 
-export function AlbumCard({ album, index = 0 }: { album: GalleryAlbum; index?: number }) {
+export function AlbumCard({ album, index = 0 }: { album: GalleryAlbumSummary; index?: number }) {
   return (
     <Link className="album-card" href={`/albums/${album.slug}`}>
       <div className="album-card-media">
         {album.coverPhoto?.previewUrl ? (
-          <img
-            src={album.coverPhoto.previewUrl}
+          <ResponsivePhotoImage
+            photo={album.coverPhoto}
             alt={album.title}
+            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 50vw, 33vw"
+            preferredWidth={640}
             loading="lazy"
-            decoding="async"
           />
         ) : (
           <PhotoPlaceholder index={index} />
@@ -22,7 +23,7 @@ export function AlbumCard({ album, index = 0 }: { album: GalleryAlbum; index?: n
       </div>
       <div className="album-card-caption">
         <span className="album-card-meta">
-          {formatPhotoYear(album.publishedAt)} · {album.photos.length} 张照片
+          {formatPhotoYear(album.publishedAt)} · {album.photoCount} 张照片
         </span>
         <h3>{album.title}</h3>
       </div>
