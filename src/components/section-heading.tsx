@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 export function SectionHeading({
-  eyebrow,
+  label,
   title,
   href,
   action = "查看全部",
 }: {
-  eyebrow: string;
+  label: string;
   title: string;
   href?: string;
   action?: string;
@@ -14,12 +14,12 @@ export function SectionHeading({
   return (
     <div className="section-heading">
       <div>
-        <span className="eyebrow">{eyebrow}</span>
+        <span className="label">{label}</span>
         <h2>{title}</h2>
       </div>
       {href ? (
         <Link className="text-link" href={href}>
-          {action} <span>↗</span>
+          {action} <span className="text-link-arrow">→</span>
         </Link>
       ) : null}
     </div>

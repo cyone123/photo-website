@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { PhotoDetails } from "@/components/photo-details";
 import { PhotoPlaceholder } from "@/components/photo-placeholder";
-import { SiteHeader } from "@/components/site-header";
 import { getPhotoById } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
@@ -33,33 +32,36 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
   }
 
   const parentAlbum = photo.albums[0];
+  const camera = [photo.cameraMake, photo.cameraModel].filter(Boolean).join(" ");
 
   return (
-    <>
-      <SiteHeader />
-      <main className="page-frame photo-page">
-        <Breadcrumbs current={photo.title ?? "照片"} parent={parentAlbum?.title} />
+    <main className="page-frame page-frame-main">
+      <Breadcrumbs current={photo.title ?? "照片"} parent={parentAlbum?.title} />
 
-        <div className="photo-viewer-layout">
-          <section className="photo-viewer-stage">
-            {photo.detailUrl ? (
-              <img src={photo.detailUrl} alt={photo.title ?? "相册照片"} decoding="async" />
-            ) : (
-              <PhotoPlaceholder index={Number.parseInt(photo.id.slice(0, 2), 16) || 0} />
-            )}
-            <div className="photo-viewer-footer">
-              <span>
-                {photo.width} × {photo.height}
-              </span>
-              {parentAlbum ? (
-                <Link href={`/albums/${parentAlbum.slug}`}>返回 {parentAlbum.title} ↗</Link>
-              ) : null}
-            </div>
-          </section>
+      <header className="page-head">
+        <span className="label">Photo</span>
+        <h1>{photo.title ?? "未命名照片"}</h1>
+        {photo.description ? <p className="page-head-meta">{photo.description}</p> : null}
+      </header>
 
-          <PhotoDetails photo={photo} />
-        </div>
-      </main>
-    </>
+      <figure className="photo-stage">
+        {photo.detailUrl ? (
+          <img src={photo.detailUrl} alt={photo.title ?? "相册照片"} decoding="async" />
+        ) : (
+          <PhotoPlaceholder index={Number.parseInt(photo.id.slice(0, 2), 16) || 0} />
+        )}
+        <figcaption className="photo-stage-footer">
+          <span>
+            {photo.width} × {photo.height}
+            {camera ? ` · ${camera}` : ""}
+          </span>
+          {parentAlbum ? (
+            <Link href={`/albums/${parentAlbum.slug}`}>返回 {parentAlbum.title} →</Link>
+          ) : null}
+        </figcaption>
+      </figure>
+
+      <PhotoDetails photo={photo} />
+    </main>
   );
 }

@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoGrid } from "@/components/photo-grid";
-import { SiteHeader } from "@/components/site-header";
-import { getAlbumBySlug, formatPhotoYear } from "@/lib/gallery";
+import { formatPhotoYear, getAlbumBySlug } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -31,29 +30,23 @@ export default async function AlbumPage({ params }: AlbumPageProps) {
   }
 
   return (
-    <>
-      <SiteHeader />
-      <main className="page-frame album-page">
-        <Breadcrumbs current={album.title} parent="相册" />
+    <main className="page-frame page-frame-main">
+      <Breadcrumbs current={album.title} parent="相册" />
 
-        <section className="album-intro">
-          <div>
-            <span className="eyebrow">
-              ALBUM / {formatPhotoYear(album.publishedAt)} /{" "}
-              {String(album.photos.length).padStart(2, "0")} IMAGES
-            </span>
-            <h1>{album.title}</h1>
-            <p>{album.description ?? "一组被放在一起观看的照片。"}</p>
-          </div>
-          <div className="album-intro-mark">{String(album.photos.length).padStart(2, "0")}</div>
-        </section>
+      <header className="page-head">
+        <span className="label">
+          Album / {formatPhotoYear(album.publishedAt)} /{" "}
+          {String(album.photos.length).padStart(2, "0")} Photos
+        </span>
+        <h1>{album.title}</h1>
+        {album.description ? <p className="page-head-meta">{album.description}</p> : null}
+      </header>
 
-        {album.photos.length > 0 ? (
-          <PhotoGrid photos={album.photos} />
-        ) : (
-          <EmptyState title="这个相册还没有照片。" description="照片导入并发布后会在这里出现。" />
-        )}
-      </main>
-    </>
+      {album.photos.length > 0 ? (
+        <PhotoGrid photos={album.photos} />
+      ) : (
+        <EmptyState title="这个相册还没有照片。" description="照片导入并发布后会在这里出现。" />
+      )}
+    </main>
   );
 }

@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
 
 const palettes = [
-  ["#c8d3c4", "#8b9f8c", "#e9dfc8"],
-  ["#d7c0ac", "#9a6d57", "#eee5d7"],
-  ["#b7c9d4", "#637f8d", "#e3d5c8"],
-  ["#d5c7d9", "#89718c", "#eee3d1"],
-  ["#d6d0b7", "#928956", "#e6d7c0"],
+  ["#16181d", "#0a0b0e", "#1c2027"],
+  ["#1a1714", "#0c0a09", "#221d18"],
+  ["#141a1c", "#090b0c", "#1a2225"],
+  ["#181419", "#0b090c", "#201a24"],
+  ["#171a14", "#0a0c09", "#1e231a"],
 ];
 
 export function PhotoPlaceholder({

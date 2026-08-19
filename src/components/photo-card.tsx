@@ -1,7 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "./arrow-up-right";
 import { PhotoPlaceholder } from "./photo-placeholder";
 import { formatPhotoDate, type GalleryPhoto } from "@/lib/gallery";
 
@@ -31,16 +30,11 @@ export function PhotoCard({
         ) : (
           <PhotoPlaceholder index={index} />
         )}
-        <span className="photo-card-index">{String(index + 1).padStart(2, "0")}</span>
+        <span className="card-index">{String(index + 1).padStart(2, "0")}</span>
       </div>
       <div className="photo-card-caption">
-        <div>
-          <span className="photo-card-date">{formatPhotoDate(photo.takenAt)}</span>
-          <h3>{photo.title ?? "未命名照片"}</h3>
-        </div>
-        <span className="photo-card-arrow">
-          <ArrowUpRight />
-        </span>
+        <span className="photo-card-date">{formatPhotoDate(photo.takenAt)}</span>
+        <h3>{photo.title ?? "未命名照片"}</h3>
       </div>
     </Link>
   );

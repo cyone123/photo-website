@@ -1,15 +1,21 @@
+/* 设计系统：BMW M 风格 — 纯黑画布、白色大写标题、细体正文、M 三色条、0 圆角、发丝线 */
+
 :root {
-  --paper: #f3efe7;
-  --paper-deep: #e8e0d3;
-  --paper-light: #fbf9f4;
-  --ink: #1d2922;
-  --ink-soft: #435047;
-  --muted: #747d73;
-  --line: rgba(29, 41, 34, 0.16);
-  --line-light: rgba(29, 41, 34, 0.09);
-  --accent: #b65a3a;
-  --accent-deep: #8f4129;
-  --shadow: 0 22px 70px rgba(48, 42, 32, 0.13);
+  --canvas: #000000;
+  --surface-soft: #0d0d0d;
+  --surface-card: #1a1a1a;
+  --on-dark: #ffffff;
+  --body: #bbbbbb;
+  --body-strong: #e6e6e6;
+  --muted: #7e7e7e;
+  --hairline: #3c3c3c;
+  --hairline-strong: #262626;
+  --m-blue-light: #0066b1;
+  --m-blue-dark: #1c69d4;
+  --m-red: #e22718;
+  --font-sans:
+    "Inter", "BMWTypeNextLatin", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
 }
 
 * {
@@ -17,18 +23,18 @@
 }
 
 html {
-  background: var(--paper);
+  background: var(--canvas);
+  color-scheme: dark;
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 8% 7%, rgba(182, 90, 58, 0.1), transparent 28rem),
-    radial-gradient(circle at 93% 53%, rgba(131, 152, 132, 0.12), transparent 30rem), var(--paper);
-  color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 15px;
+  background: var(--canvas);
+  color: var(--body);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 300;
   line-height: 1.5;
 }
 
@@ -53,94 +59,168 @@ h3,
 p,
 blockquote,
 dl,
-dd {
+dd,
+figure {
   margin: 0;
 }
 
 h1,
 h2,
-h3,
-blockquote {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
+h3 {
+  color: var(--on-dark);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
-.site-header,
-.page-frame,
-.site-footer {
-  width: min(1280px, calc(100% - 72px));
+/* ---------- 品牌签名：M 三色条 ---------- */
+
+.m-stripe {
+  display: flex;
+  height: 4px;
+  background: var(--canvas);
+}
+
+.m-stripe::before {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  background: linear-gradient(
+    90deg,
+    var(--m-blue-light) 0 33.4%,
+    var(--m-blue-dark) 33.4% 66.7%,
+    var(--m-red) 66.7% 100%
+  );
+  content: "";
+}
+
+.brand-stripe {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.brand-stripe i {
+  height: 3px;
+}
+
+.brand-stripe i:nth-child(1) {
+  background: var(--m-blue-light);
+}
+
+.brand-stripe i:nth-child(2) {
+  background: var(--m-blue-dark);
+}
+
+.brand-stripe i:nth-child(3) {
+  background: var(--m-red);
+}
+
+/* ---------- 版式基元 ---------- */
+
+.page-frame {
+  width: min(1440px, calc(100% - 48px));
   margin-inline: auto;
 }
 
+.label {
+  display: block;
+  color: var(--body-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--on-dark);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.text-link .text-link-arrow {
+  color: var(--muted);
+  font-weight: 400;
+  transition: transform 160ms ease;
+}
+
+.text-link:hover .text-link-arrow {
+  transform: translateX(3px);
+}
+
+/* ---------- 顶部导航 ---------- */
+
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+
+.site-header-row {
   display: flex;
-  min-height: 90px;
+  height: 64px;
   align-items: center;
   justify-content: space-between;
-  gap: 28px;
-  border-bottom: 1px solid var(--line);
+  gap: 24px;
 }
 
 .site-brand {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
-  gap: 11px;
-  flex-shrink: 0;
+  gap: 12px;
 }
 
-.site-brand-mark {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  place-items: center;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.3rem;
-  line-height: 1;
-}
-
-.site-brand strong,
-.site-brand small {
+.site-brand-text strong {
   display: block;
+  color: var(--on-dark);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
-.site-brand strong {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-}
-
-.site-brand small {
+.site-brand-text small {
+  display: block;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 0.55rem;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .site-nav {
   display: flex;
   align-items: center;
   gap: 28px;
-  margin-left: auto;
-  color: var(--ink-soft);
-  font-size: 0.78rem;
 }
 
 .site-nav a {
   position: relative;
   padding-block: 8px;
+  color: var(--body);
+  font-size: 14px;
+  letter-spacing: 0.5px;
   transition: color 160ms ease;
 }
 
 .site-nav a::after {
   position: absolute;
   right: 0;
-  bottom: 2px;
+  bottom: 0;
   left: 0;
-  height: 1px;
-  background: var(--accent);
+  height: 2px;
+  background: var(--on-dark);
   content: "";
   transform: scaleX(0);
   transform-origin: right;
@@ -148,7 +228,7 @@ blockquote {
 }
 
 .site-nav a:hover {
-  color: var(--accent-deep);
+  color: var(--on-dark);
 }
 
 .site-nav a:hover::after {
@@ -156,278 +236,110 @@ blockquote {
   transform-origin: left;
 }
 
-.site-header-note {
-  min-width: 150px;
-  color: var(--muted);
-  font-size: 0.68rem;
-  text-align: right;
-}
+/* ---------- 首页 hero 照片带 ---------- */
 
-.page-frame {
-  padding-bottom: 130px;
-}
-
-.eyebrow {
-  display: inline-block;
-  color: var(--accent-deep);
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  line-height: 1.2;
-}
-
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border-bottom: 1px solid var(--ink);
-  padding-bottom: 4px;
-  font-size: 0.78rem;
-  transition:
-    color 160ms ease,
-    border-color 160ms ease;
-}
-
-.text-link span {
-  color: var(--accent);
-  font-size: 0.9rem;
-}
-
-.text-link:hover {
-  border-color: var(--accent);
-  color: var(--accent-deep);
-}
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px solid var(--ink);
-  border-radius: 999px;
-  padding: 12px 18px;
-  font-size: 0.76rem;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.button svg,
-.photo-card-arrow svg,
-.album-card-arrow svg {
-  width: 16px;
-  height: 16px;
-}
-
-.button:hover {
-  transform: translateY(-2px);
-}
-
-.button-primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fffaf4;
-}
-
-.button-primary:hover {
-  border-color: var(--accent-deep);
-  background: var(--accent-deep);
-}
-
-.home-hero {
-  display: grid;
-  min-height: 710px;
-  grid-template-columns: minmax(0, 1.06fr) minmax(370px, 0.94fr);
-  align-items: center;
-  gap: clamp(60px, 10vw, 150px);
-  border-bottom: 1px solid var(--line);
-}
-
-.hero-copy {
-  padding-block: 80px;
-}
-
-.hero-copy h1 {
-  max-width: 730px;
-  margin-top: 29px;
-  font-size: clamp(3.4rem, 7.1vw, 7rem);
-  letter-spacing: -0.075em;
-  line-height: 0.91;
-}
-
-.hero-copy h1 em {
-  color: var(--accent);
-  font-style: normal;
-}
-
-.hero-copy > p {
-  max-width: 480px;
-  margin-top: 34px;
-  color: var(--muted);
-  font-size: 0.91rem;
-  line-height: 1.8;
-}
-
-.hero-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 24px;
-  margin-top: 31px;
-}
-
-.hero-stats {
-  display: flex;
-  gap: 45px;
-  margin-top: 84px;
-}
-
-.hero-stats div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.hero-stats strong {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.45rem;
-  font-weight: 400;
-}
-
-.hero-stats span {
-  color: var(--muted);
-  font-size: 0.63rem;
-  letter-spacing: 0.1em;
-}
-
-.hero-visual {
-  position: relative;
-  width: min(100%, 460px);
-  justify-self: end;
-  padding-bottom: 31px;
-}
-
-.hero-visual-topline,
-.hero-visual-note,
-.hero-frame-caption,
-.photo-viewer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-}
-
-.hero-visual-topline {
-  margin-bottom: 12px;
-}
-
-.hero-frame {
+.hero-band {
   display: block;
-  border: 1px solid var(--line);
-  background: var(--paper-light);
-  padding: 10px 10px 0;
-  box-shadow: var(--shadow);
-  transition:
-    transform 220ms ease,
-    box-shadow 220ms ease;
-}
-
-.hero-frame:hover {
-  box-shadow: 0 26px 80px rgba(48, 42, 32, 0.18);
-  transform: rotate(-1deg) translateY(-4px);
-}
-
-.hero-frame-media {
-  position: relative;
-  aspect-ratio: 0.88;
   overflow: hidden;
-  background: var(--paper-deep);
+  background: var(--surface-soft);
 }
 
-.hero-frame-media > img {
+.hero-band-media {
+  position: relative;
+  aspect-ratio: 21 / 9;
+  max-height: 76vh;
+  min-height: 300px;
+  overflow: hidden;
+}
+
+.hero-band-media > img,
+.hero-band-media > .photo-placeholder {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.hero-frame-stamp {
-  position: absolute;
-  top: 17px;
-  left: 17px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-  padding: 7px 10px;
-  color: #fff;
-  font-size: 0.57rem;
-  letter-spacing: 0.13em;
-  text-shadow: 0 1px 9px rgba(0, 0, 0, 0.25);
-}
-
-.hero-frame-caption {
-  min-height: 49px;
-  padding-inline: 2px;
-  color: var(--ink-soft);
-}
-
-.hero-frame-caption span:last-child {
-  color: var(--accent-deep);
-  font-size: 0.58rem;
-}
-
-.hero-visual-note {
+.hero-band-copy {
   position: absolute;
   right: 0;
   bottom: 0;
   left: 0;
-  justify-content: flex-end;
+  padding: 72px max(24px, calc((100% - 1440px) / 2)) 28px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.66), rgba(0, 0, 0, 0));
 }
 
-.home-section {
-  padding-top: 120px;
+.hero-band-copy h1 {
+  margin-top: 12px;
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.02;
+  text-transform: uppercase;
+}
+
+.hero-band-meta {
+  display: block;
+  margin-top: 10px;
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 300;
+}
+
+.hero-band-empty {
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+
+.hero-band-empty .hero-band-copy {
+  position: static;
+  max-width: 1440px;
+  padding: 72px 24px 40px;
+  margin-inline: auto;
+  background: none;
+}
+
+/* ---------- 区块 ---------- */
+
+.section {
+  padding-top: 56px;
+}
+
+.page-frame-main {
+  padding-bottom: 72px;
 }
 
 .section-heading {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 34px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 18px;
 }
 
 .section-heading h2 {
-  margin-top: 14px;
-  font-size: clamp(2.3rem, 4vw, 4rem);
-  letter-spacing: -0.065em;
-  line-height: 0.95;
+  margin-top: 8px;
+  font-size: clamp(26px, 3.4vw, 40px);
+  line-height: 1.1;
+  text-transform: uppercase;
 }
+
+/* ---------- 相册网格 ---------- */
 
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 16px;
 }
 
-.home-album-grid .album-card:first-child {
-  grid-column: span 2;
-}
-
-.album-card,
-.photo-card {
+.album-card {
   display: block;
 }
 
 .album-card-media {
   position: relative;
-  aspect-ratio: 1.44;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: var(--paper-deep);
-}
-
-.home-album-grid .album-card:first-child .album-card-media {
-  aspect-ratio: 2.05;
+  background: var(--surface-soft);
 }
 
 .album-card-media > img {
@@ -439,97 +351,54 @@ blockquote {
 
 .album-card:hover .album-card-media > img,
 .photo-card:hover .photo-card-media > img {
-  transform: scale(1.035);
+  transform: scale(1.03);
 }
 
-.album-card-number,
-.photo-card-index {
+.card-index {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 0.63rem;
+  top: 12px;
+  left: 12px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
   letter-spacing: 0.1em;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
 }
 
-.album-card-caption,
-.photo-card-caption {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  padding-top: 14px;
+.album-card-caption {
+  padding-top: 12px;
 }
 
-.album-card-meta,
-.photo-card-date {
+.album-card-meta {
   display: block;
   color: var(--muted);
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 
-.album-card h3,
-.photo-card h3 {
-  margin-top: 5px;
-  font-size: 1.12rem;
-  letter-spacing: -0.025em;
+.album-card-caption h3 {
+  margin-top: 4px;
+  font-size: 18px;
+  line-height: 1.3;
 }
 
-.album-card-arrow,
-.photo-card-arrow {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  color: var(--accent);
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.album-card:hover .album-card-arrow,
-.photo-card:hover .photo-card-arrow {
-  background: var(--accent);
-  color: #fffaf4;
-  transform: rotate(8deg);
-}
+/* ---------- 照片网格 ---------- */
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 34px 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px 16px;
 }
 
 .photo-card {
-  grid-column: span 4;
-}
-
-.photo-card:nth-child(5n + 1),
-.photo-card:nth-child(5n + 4) {
-  grid-column: span 5;
-}
-
-.photo-card:nth-child(5n + 2),
-.photo-card:nth-child(5n + 3) {
-  grid-column: span 3;
-}
-
-.photo-card:nth-child(5n) {
-  grid-column: span 4;
+  display: block;
 }
 
 .photo-card-media {
   position: relative;
-  aspect-ratio: var(--photo-ratio);
-  min-height: 190px;
+  aspect-ratio: var(--photo-ratio, 4 / 3);
+  min-height: 180px;
   overflow: hidden;
-  background: var(--paper-deep);
+  background: var(--surface-soft);
 }
 
 .photo-card-media > img {
@@ -539,438 +408,299 @@ blockquote {
   transition: transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
+.photo-card-caption {
+  padding-top: 10px;
+}
+
+.photo-card-date {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.photo-card-caption h3 {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* ---------- 照片占位 ---------- */
+
 .photo-placeholder {
   position: relative;
   display: flex;
   width: 100%;
   height: 100%;
-  min-height: 190px;
+  min-height: 180px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background:
-    radial-gradient(
-      circle at 52% 42%,
-      transparent 0 12%,
-      rgba(255, 255, 255, 0.47) 12.4% 12.8%,
-      transparent 13.2%
-    ),
-    linear-gradient(
-      135deg,
-      var(--placeholder-one),
-      var(--placeholder-two) 57%,
-      var(--placeholder-three)
-    );
-  color: rgba(29, 41, 34, 0.56);
-}
-
-.photo-placeholder::before,
-.photo-placeholder::after {
-  position: absolute;
-  border: 1px solid rgba(255, 255, 255, 0.46);
-  border-radius: 50%;
-  content: "";
-}
-
-.photo-placeholder::before {
-  width: 57%;
-  aspect-ratio: 1;
-}
-
-.photo-placeholder::after {
-  width: 82%;
-  aspect-ratio: 1;
-  opacity: 0.56;
+  background: linear-gradient(
+    135deg,
+    var(--placeholder-one),
+    var(--placeholder-two) 57%,
+    var(--placeholder-three)
+  );
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .placeholder-glyph {
   position: relative;
   z-index: 1;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 2.8rem;
+  font-size: 2.4rem;
   line-height: 1;
 }
 
 .placeholder-caption {
   position: relative;
   z-index: 1;
-  margin-top: 12px;
-  font-size: 0.55rem;
+  margin-top: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
 }
 
-.photo-placeholder-compact {
-  min-height: 90px;
+/* ---------- 内页页头 ---------- */
+
+.page-head {
+  margin-top: 40px;
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 28px;
 }
 
-.photo-placeholder-compact .placeholder-glyph {
-  font-size: 1.8rem;
+.page-head h1 {
+  margin-top: 12px;
+  font-size: clamp(34px, 5.6vw, 56px);
+  line-height: 1.05;
+  text-transform: uppercase;
 }
 
-.empty-state {
-  display: flex;
-  min-height: 320px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 48px 0;
-}
-
-.empty-state h2 {
-  margin-top: 24px;
-  font-size: clamp(2rem, 4vw, 3.5rem);
-  letter-spacing: -0.06em;
-}
-
-.empty-state p {
-  max-width: 420px;
-  margin-top: 14px;
+.page-head-meta {
+  max-width: 640px;
+  margin-top: 12px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 14px;
 }
 
-.empty-state .text-link {
-  margin-top: 26px;
-}
-
-.home-latest-section {
-  padding-top: 150px;
-}
-
-.recent-empty {
-  display: flex;
-  min-height: 180px;
-  align-items: center;
-  justify-content: space-between;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.home-manifesto {
-  max-width: 760px;
-  padding-top: 170px;
-}
-
-.home-manifesto blockquote {
-  margin: 28px 0 27px;
-  font-size: clamp(2.3rem, 5vw, 5rem);
-  letter-spacing: -0.07em;
-  line-height: 0.98;
-}
-
-.site-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  border-top: 1px solid var(--line);
-  padding-block: 26px 35px;
-  color: var(--muted);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-}
-
-.archive-heading {
-  display: flex;
-  min-height: 440px;
-  flex-direction: column;
-  justify-content: end;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 55px;
-}
-
-.archive-heading h1 {
-  margin-top: 26px;
-  font-size: clamp(4rem, 10vw, 10rem);
-  letter-spacing: -0.09em;
-  line-height: 0.8;
-}
-
-.archive-heading p {
-  margin-top: 25px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.archive-content {
-  padding-top: 105px;
-}
-
-.album-page,
-.photo-page {
-  padding-top: 27px;
+.page-head + .photo-grid,
+.page-head + .album-grid {
+  margin-top: 28px;
 }
 
 .breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  margin-top: 20px;
   color: var(--muted);
-  font-size: 0.66rem;
-}
-
-.breadcrumbs a:hover {
-  color: var(--accent-deep);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .breadcrumbs-current {
-  color: var(--ink-soft);
+  color: var(--body-strong);
 }
 
-.album-intro {
-  display: flex;
-  min-height: 385px;
-  align-items: end;
-  justify-content: space-between;
-  gap: 40px;
-  border-bottom: 1px solid var(--line);
-  padding: 90px 0 52px;
+/* ---------- 照片详情 ---------- */
+
+.photo-stage {
+  margin-top: 28px;
+  background: var(--surface-soft);
 }
 
-.album-intro h1 {
-  margin-top: 23px;
-  font-size: clamp(3.6rem, 8vw, 8rem);
-  letter-spacing: -0.09em;
-  line-height: 0.83;
-}
-
-.album-intro p {
-  max-width: 450px;
-  margin-top: 27px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.album-intro-mark {
-  color: var(--accent);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(6rem, 14vw, 13rem);
-  letter-spacing: -0.12em;
-  line-height: 0.7;
-  opacity: 0.76;
-}
-
-.album-page .photo-grid {
-  padding-top: 72px;
-}
-
-.photo-viewer-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.26fr) minmax(300px, 0.74fr);
-  gap: clamp(44px, 9vw, 130px);
-  padding-top: 72px;
-}
-
-.photo-viewer-stage {
-  align-self: start;
-  background: #26312a;
-  padding: 12px 12px 0;
-  box-shadow: var(--shadow);
-}
-
-.photo-viewer-stage > img,
-.photo-viewer-stage > .photo-placeholder {
+.photo-stage > img,
+.photo-stage > .photo-placeholder {
   width: 100%;
-  max-height: 73vh;
-  min-height: 410px;
+  max-height: 82vh;
+  min-height: 280px;
+  margin-inline: auto;
   object-fit: contain;
 }
 
-.photo-viewer-stage > img {
+.photo-stage > img {
   height: auto;
-  background: #202a24;
 }
 
-.photo-viewer-footer {
-  min-height: 51px;
-  color: rgba(246, 242, 233, 0.7);
-}
-
-.photo-viewer-footer a {
-  color: #f6f2e9;
-}
-
-.photo-viewer-footer a:hover {
-  color: #e5a285;
-}
-
-.photo-details {
-  align-self: center;
-  padding-bottom: 35px;
-}
-
-.photo-detail-intro h1 {
-  margin-top: 21px;
-  font-size: clamp(2.6rem, 5vw, 5rem);
-  letter-spacing: -0.07em;
-  line-height: 0.9;
-}
-
-.photo-detail-intro p {
-  max-width: 380px;
-  margin-top: 21px;
+.photo-stage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  border-bottom: 1px solid var(--hairline-strong);
   color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.75;
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 
-.exif-list {
-  margin-top: 55px;
-  border-top: 1px solid var(--line);
+.photo-stage-footer a:hover {
+  color: var(--on-dark);
 }
 
-.exif-list > div {
+.spec-grid {
   display: grid;
-  grid-template-columns: 95px 1fr;
-  gap: 18px;
-  border-bottom: 1px solid var(--line-light);
-  padding-block: 13px;
-  font-size: 0.72rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
 }
 
-.exif-list dt {
+.spec-cell {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  background: var(--surface-soft);
+  padding: 18px 20px;
+}
+
+.spec-cell dt {
   color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 
-.exif-list dd {
-  color: var(--ink-soft);
-  text-align: right;
+.spec-cell dd {
+  color: var(--on-dark);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.about-hero {
-  display: grid;
-  min-height: 600px;
-  align-content: center;
-  grid-template-columns: 1fr 1fr;
-  gap: 70px;
-  border-bottom: 1px solid var(--line);
-}
-
-.about-hero h1 {
-  max-width: 600px;
-  margin-top: 27px;
-  font-size: clamp(3.6rem, 7vw, 7rem);
-  letter-spacing: -0.09em;
-  line-height: 0.88;
-}
-
-.about-hero h1 em {
-  color: var(--accent);
-  font-style: normal;
-}
-
-.about-hero > p {
-  max-width: 390px;
-  align-self: end;
-  padding-bottom: 9px;
-  color: var(--muted);
-  font-size: 0.93rem;
-  line-height: 1.85;
-}
-
-.about-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 70px;
-  padding-top: 120px;
-}
-
-.about-columns h2 {
-  max-width: 370px;
-  margin-top: 24px;
-  font-size: clamp(2rem, 4vw, 3.7rem);
-  letter-spacing: -0.07em;
-  line-height: 0.94;
-}
+/* ---------- 关于页 ---------- */
 
 .about-copy {
-  max-width: 430px;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.9;
+  max-width: 600px;
+  margin-top: 32px;
 }
 
 .about-copy p + p {
-  margin-top: 25px;
+  margin-top: 18px;
 }
 
-.about-note {
-  max-width: 770px;
-  margin-top: 145px;
-  border-top: 1px solid var(--line);
-  padding-top: 25px;
+.about-copy .text-link {
+  margin-top: 28px;
 }
 
-.about-note p {
-  margin-top: 35px;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2.1rem, 4vw, 4rem);
-  letter-spacing: -0.06em;
-  line-height: 1;
+/* ---------- 空状态 / 404 ---------- */
+
+.empty-state {
+  border-block: 1px solid var(--hairline);
+  padding: 56px 0;
+}
+
+.empty-state h2 {
+  margin-top: 16px;
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1.1;
+}
+
+.empty-state p {
+  max-width: 460px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.empty-state .text-link {
+  margin-top: 24px;
 }
 
 .not-found-page {
-  display: flex;
-  min-height: 70vh;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
+  min-height: 56vh;
+  padding-top: 40px;
 }
 
 .not-found-page h1 {
-  max-width: 700px;
-  margin-top: 25px;
-  font-size: clamp(3.5rem, 8vw, 8rem);
-  letter-spacing: -0.09em;
-  line-height: 0.85;
+  margin-top: 16px;
+  font-size: clamp(34px, 6vw, 56px);
+  line-height: 1.05;
 }
 
 .not-found-page p {
-  margin-top: 25px;
+  margin-top: 14px;
   color: var(--muted);
 }
 
 .not-found-page .text-link {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
+/* ---------- 页脚 ---------- */
+
+.site-footer {
+  border-top: 1px solid var(--hairline);
+  padding-block: 28px;
+}
+
+.site-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.site-footer-brand {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.site-footer-nav {
+  display: flex;
+  gap: 20px;
+}
+
+.site-footer-nav a {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: color 160ms ease;
+}
+
+.site-footer-nav a:hover {
+  color: var(--on-dark);
+}
+
+/* ---------- 加载态 ---------- */
+
 .loading-page {
-  padding-top: 100px;
+  padding-top: 56px;
 }
 
 .loading-line,
 .loading-card {
   background: linear-gradient(
     90deg,
-    rgba(29, 41, 34, 0.05),
-    rgba(29, 41, 34, 0.12),
-    rgba(29, 41, 34, 0.05)
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.04)
   );
   background-size: 200% 100%;
   animation: loading-shimmer 1.5s infinite;
 }
 
 .loading-line {
-  height: 80px;
+  height: 56px;
 }
 
 .loading-line-wide {
-  width: 55%;
+  width: 45%;
 }
 
 .loading-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-top: 75px;
+  margin-top: 32px;
 }
 
 .loading-card {
-  aspect-ratio: 1.2;
+  aspect-ratio: 4 / 3;
 }
 
 @keyframes loading-shimmer {
@@ -982,201 +712,59 @@ blockquote {
   }
 }
 
-@media (max-width: 960px) {
-  .site-header,
-  .page-frame,
-  .site-footer {
-    width: min(100% - 44px, 760px);
+/* ---------- 响应式 ---------- */
+
+@media (max-width: 1024px) {
+  .album-grid,
+  .photo-grid,
+  .spec-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .home-hero {
-    grid-template-columns: 1fr 0.82fr;
-    gap: 45px;
-  }
-
-  .hero-copy h1 {
-    font-size: clamp(3.4rem, 7vw, 5.4rem);
-  }
-
-  .photo-viewer-layout {
-    grid-template-columns: 1fr 0.85fr;
-    gap: 45px;
+  .hero-band-copy {
+    padding-inline: max(16px, calc((100% - 1024px) / 2));
   }
 }
 
-@media (max-width: 720px) {
-  .site-header,
-  .page-frame,
-  .site-footer {
-    width: min(100% - 36px, 600px);
-  }
-
-  .site-header {
-    min-height: 78px;
-    gap: 18px;
-  }
-
-  .site-header-note {
-    display: none;
+@media (max-width: 640px) {
+  .page-frame {
+    width: calc(100% - 32px);
   }
 
   .site-nav {
-    gap: 17px;
+    gap: 16px;
   }
 
-  .home-hero {
-    display: block;
-    min-height: auto;
+  .hero-band-media {
+    aspect-ratio: 4 / 3;
+    min-height: 240px;
   }
 
-  .hero-copy {
-    padding: 92px 0 70px;
+  .hero-band-copy {
+    padding: 48px 16px 20px;
   }
 
-  .hero-copy h1 {
-    max-width: 560px;
-    font-size: clamp(3.25rem, 13vw, 5.5rem);
-  }
-
-  .hero-stats {
-    margin-top: 58px;
-  }
-
-  .hero-visual {
-    width: min(100%, 420px);
-    margin: 0 auto;
-    padding-bottom: 40px;
-  }
-
-  .home-section {
-    padding-top: 92px;
-  }
-
-  .home-latest-section {
-    padding-top: 110px;
-  }
-
-  .section-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 20px;
+  .section {
+    padding-top: 40px;
   }
 
   .album-grid {
     grid-template-columns: 1fr;
   }
 
-  .home-album-grid .album-card:first-child {
-    grid-column: auto;
-  }
-
-  .home-album-grid .album-card:first-child .album-card-media,
-  .album-card-media {
-    aspect-ratio: 1.25;
-  }
-
   .photo-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 30px 12px;
+    gap: 24px 12px;
   }
 
-  .photo-card,
-  .photo-card:nth-child(5n + 1),
-  .photo-card:nth-child(5n + 2),
-  .photo-card:nth-child(5n + 3),
-  .photo-card:nth-child(5n + 4),
-  .photo-card:nth-child(5n) {
-    grid-column: span 1;
-  }
-
-  .photo-card:nth-child(3n + 1) {
-    grid-column: span 2;
-  }
-
-  .archive-heading {
-    min-height: 360px;
-  }
-
-  .archive-content {
-    padding-top: 78px;
-  }
-
-  .album-intro {
-    min-height: 330px;
-    padding-top: 80px;
-  }
-
-  .album-intro-mark {
-    display: none;
-  }
-
-  .album-page .photo-grid {
-    padding-top: 55px;
-  }
-
-  .photo-viewer-layout,
-  .about-hero,
-  .about-columns {
-    display: block;
-  }
-
-  .photo-viewer-layout {
-    padding-top: 50px;
-  }
-
-  .photo-details {
-    padding-top: 58px;
-  }
-
-  .about-hero {
-    min-height: auto;
-    padding: 105px 0 70px;
-  }
-
-  .about-hero > p {
-    margin-top: 40px;
-  }
-
-  .about-columns {
-    padding-top: 84px;
-  }
-
-  .about-copy {
-    margin-top: 45px;
-  }
-
-  .site-footer {
-    align-items: flex-start;
+  .site-footer-row {
     flex-direction: column;
-    gap: 8px;
-  }
-}
-
-@media (max-width: 440px) {
-  .site-brand small {
-    display: none;
-  }
-
-  .site-nav {
-    font-size: 0.72rem;
-  }
-
-  .hero-copy h1 {
-    font-size: 3.35rem;
-  }
-
-  .hero-stats {
-    justify-content: space-between;
+    align-items: flex-start;
     gap: 12px;
   }
 
-  .hero-stats strong {
-    font-size: 1.25rem;
-  }
-
-  .photo-viewer-stage > img,
-  .photo-viewer-stage > .photo-placeholder {
-    min-height: 260px;
+  .photo-stage > img,
+  .photo-stage > .photo-placeholder {
+    min-height: 200px;
   }
 }
 
