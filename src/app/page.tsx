@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlbumCard } from "@/components/album-card";
@@ -24,12 +25,19 @@ export default async function Home() {
     : featuredPhoto
       ? `/photos/${featuredPhoto.id}`
       : null;
+  // hero 带宽高比跟随照片原生比例（限制在 16:9–21:9），避免 cover 裁切导致构图偏移
+  const heroRatio = featuredPhoto
+    ? Math.min(Math.max(featuredPhoto.aspectRatio, 16 / 9), 21 / 9)
+    : 21 / 9;
 
   return (
     <main className="page-frame-main">
       {featuredHref ? (
         <Link className="hero-band" href={featuredHref}>
-          <div className="hero-band-media">
+          <div
+            className="hero-band-media"
+            style={{ "--hero-ratio": String(heroRatio) } as CSSProperties}
+          >
             {featuredPhoto?.detailUrl ? (
               <img
                 src={featuredPhoto.detailUrl}

@@ -246,7 +246,8 @@ h3 {
 
 .hero-band-media {
   position: relative;
-  aspect-ratio: 21 / 9;
+  width: 100%; /* 显式铺满：aspect-ratio + max-height 下 auto 宽度会按比例反推而不拉伸 */
+  aspect-ratio: var(--hero-ratio, 21 / 9);
   max-height: 76vh;
   min-height: 300px;
   overflow: hidden;
@@ -257,6 +258,7 @@ h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .hero-band-copy {
@@ -736,7 +738,6 @@ h3 {
   }
 
   .hero-band-media {
-    aspect-ratio: 4 / 3;
     min-height: 240px;
   }
 
