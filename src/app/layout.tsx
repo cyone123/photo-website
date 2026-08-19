@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Photo Website",
-  description: "个人相册照片展示网站",
+  title: {
+    default: "光的档案 · Personal Photo Archive",
+    template: "%s · 光的档案",
+  },
+  description: "一个持续更新的个人影像档案。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

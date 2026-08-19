@@ -1,0 +1,59 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { EmptyState } from "@/components/empty-state";
+import { PhotoGrid } from "@/components/photo-grid";
+import { SiteHeader } from "@/components/site-header";
+import { getAlbumBySlug, formatPhotoYear } from "@/lib/gallery";
+
+export const dynamic = "force-dynamic";
+
+type AlbumPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export async function generateMetadata({ params }: AlbumPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const album = await getAlbumBySlug(slug);
+
+  return {
+    title: album ? `${album.title} · 光的档案` : "相册 · 光的档案",
+    description: album?.description ?? "个人照片相册。",
+  };
+}
+
+export default async function AlbumPage({ params }: AlbumPageProps) {
+  const { slug } = await params;
+  const album = await getAlbumBySlug(slug);
+
+  if (!album) {
+    notFound();
+  }
+
+  return (
+    <>
+      <SiteHeader />
+      <main className="page-frame album-page">
+        <Breadcrumbs current={album.title} parent="相册" />
+
+        <section className="album-intro">
+          <div>
+            <span className="eyebrow">
+              ALBUM / {formatPhotoYear(album.publishedAt)} /{" "}
+              {String(album.photos.length).padStart(2, "0")} IMAGES
+            </span>
+            <h1>{album.title}</h1>
+            <p>{album.description ?? "一组被放在一起观看的照片。"}</p>
+          </div>
+          <div className="album-intro-mark">{String(album.photos.length).padStart(2, "0")}</div>
+        </section>
+
+        {album.photos.length > 0 ? (
+          <PhotoGrid photos={album.photos} />
+        ) : (
+          <EmptyState title="这个相册还没有照片。" description="照片导入并发布后会在这里出现。" />
+        )}
+      </main>
+    </>
+  );
+}
