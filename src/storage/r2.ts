@@ -1,4 +1,4 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readServerEnv } from "@/config/env";
 
 function createR2Client() {
@@ -39,4 +39,22 @@ export function getR2Buckets() {
     privateBucket: env.R2_PRIVATE_BUCKET,
     publicBaseUrl: env.R2_PUBLIC_BASE_URL ?? null,
   };
+}
+
+export async function putR2Object(input: {
+  bucket: string;
+  key: string;
+  body: Uint8Array;
+  contentType: string;
+  cacheControl?: string;
+}) {
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: input.bucket,
+      Key: input.key,
+      Body: input.body,
+      ContentType: input.contentType,
+      CacheControl: input.cacheControl,
+    }),
+  );
 }

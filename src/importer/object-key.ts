@@ -1,4 +1,4 @@
-import type { PublicImageFormat, PublicImageWidth } from "./constants";
+import type { PublicImageFormat } from "./constants";
 
 export function originalObjectKey(photoId: string, extension: string) {
   return `photos/${photoId}/original.${extension}`;
@@ -6,7 +6,7 @@ export function originalObjectKey(photoId: string, extension: string) {
 
 export function publicVariantObjectKey(
   photoId: string,
-  width: PublicImageWidth,
+  width: number,
   format: PublicImageFormat = "webp",
 ) {
   return `photos/${photoId}/${width}.${format}`;
