@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { PhotoPlaceholder } from "./photo-placeholder";
 import { ResponsivePhotoImage } from "./responsive-photo-image";
-import { formatPhotoDate, type GalleryPhoto } from "@/lib/gallery";
+import type { GalleryPhoto } from "@/lib/gallery";
 
 export function PhotoCard({
   photo,
@@ -15,10 +15,15 @@ export function PhotoCard({
 }) {
   return (
     <Link
-      className="photo-card"
+      className="photo-card justified-photo-card"
       href={`/photos/${photo.id}`}
       data-lightbox-index={index}
-      style={{ "--photo-ratio": `${photo.width} / ${photo.height}` } as CSSProperties}
+      style={
+        {
+          "--photo-ratio": `${photo.width} / ${photo.height}`,
+          "--photo-grow": String(photo.aspectRatio),
+        } as CSSProperties
+      }
     >
       <div className="photo-card-media">
         {photo.previewUrl ? (
@@ -34,10 +39,6 @@ export function PhotoCard({
           <PhotoPlaceholder index={index} />
         )}
         <span className="card-index">{String(index + 1).padStart(2, "0")}</span>
-      </div>
-      <div className="photo-card-caption">
-        <span className="photo-card-date">{formatPhotoDate(photo.takenAt)}</span>
-        <h3>{photo.title ?? "未命名照片"}</h3>
       </div>
     </Link>
   );

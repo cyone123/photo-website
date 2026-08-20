@@ -3,9 +3,10 @@
 import type { CSSProperties } from "react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { GalleryDateAnchor, getGalleryMonth } from "./gallery-date-anchor";
 import { PhotoLightboxGallery } from "./photo-lightbox";
 import { ResponsivePhotoImage } from "./responsive-photo-image";
-import type { GalleryAlbumPhoto, GalleryDate } from "@/lib/gallery";
+import type { GalleryAlbumPhoto } from "@/lib/gallery";
 import { toLightboxPhoto } from "@/lib/lightbox";
 
 const PAGE_SIZE = 24;
@@ -14,24 +15,6 @@ type AlbumPhotoPageResponse = {
   photos: GalleryAlbumPhoto[];
   nextOffset: number | null;
 };
-
-function formatPhotoDate(value: GalleryDate) {
-  if (!value) {
-    return "未记录日期";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "未记录日期";
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
 
 function AlbumStreamCard({
   photo,
@@ -64,10 +47,6 @@ function AlbumStreamCard({
           fetchPriority={priority ? "high" : "auto"}
         />
         <span className="card-index">{String(photo.sequence).padStart(2, "0")}</span>
-      </div>
-      <div className="photo-card-caption">
-        <span className="photo-card-date">{formatPhotoDate(photo.takenAt)}</span>
-        <h3>{photo.title ?? "未命名照片"}</h3>
       </div>
     </Link>
   );
@@ -176,18 +155,26 @@ export function AlbumPhotoStream({
         photos={photos.map(toLightboxPhoto)}
         className="photo-grid photo-grid-justified"
       >
-        {photos.map((photo, index) => (
-          <Fragment key={photo.id}>
-            {photo.chapterTitle || photo.chapterText ? (
-              <header className="album-chapter">
-                <span className="label">Chapter / {String(photo.sequence).padStart(2, "0")}</span>
-                {photo.chapterTitle ? <h2>{photo.chapterTitle}</h2> : null}
-                {photo.chapterText ? <p>{photo.chapterText}</p> : null}
-              </header>
-            ) : null}
-            <AlbumStreamCard photo={photo} index={index} priority={index < 3} />
-          </Fragment>
-        ))}
+        {photos.map((photo, index) => {
+          const month = getGalleryMonth(photo.takenAt);
+          const previousMonth = index > 0 ? getGalleryMonth(photos[index - 1].takenAt) : null;
+
+          return (
+            <Fragment key={photo.id}>
+              {photo.chapterTitle || photo.chapterText ? (
+                <header className="album-chapter">
+                  <span className="label">Chapter / {String(photo.sequence).padStart(2, "0")}</span>
+                  {photo.chapterTitle ? <h2>{photo.chapterTitle}</h2> : null}
+                  {photo.chapterText ? <p>{photo.chapterText}</p> : null}
+                </header>
+              ) : null}
+              {!previousMonth || previousMonth.key !== month.key ? (
+                <GalleryDateAnchor month={month} />
+              ) : null}
+              <AlbumStreamCard photo={photo} index={index} priority={index < 3} />
+            </Fragment>
+          );
+        })}
       </PhotoLightboxGallery>
 
       <div ref={sentinelRef} className="album-load-more" aria-live="polite">

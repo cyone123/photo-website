@@ -505,24 +505,6 @@ h3 {
   transition: transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.photo-card-caption {
-  padding-top: 10px;
-}
-
-.photo-card-date {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-
-.photo-card-caption h3 {
-  margin-top: 4px;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.4;
-}
-
 /* ---------- 照片占位 ---------- */
 
 .photo-placeholder {
@@ -610,7 +592,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 28px 12px;
+  gap: 12px;
 }
 
 .photo-grid-justified::after {
@@ -628,6 +610,30 @@ h3 {
 
 .justified-photo-card .photo-card-media {
   min-height: 0;
+}
+
+.gallery-date-anchor {
+  display: flex;
+  min-height: 30px;
+  flex: 0 0 100%;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+
+.gallery-date-anchor:first-child {
+  margin-top: 0;
+}
+
+.gallery-date-anchor::after {
+  width: 26px;
+  border-top: 1px solid var(--hairline);
+  content: "";
 }
 
 .album-chapter {
