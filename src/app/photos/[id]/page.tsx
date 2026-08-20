@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { PhotoLightboxStage } from "@/components/photo-lightbox";
 import { PhotoDetails } from "@/components/photo-details";
 import { PhotoPlaceholder } from "@/components/photo-placeholder";
 import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
-import { getPhotoById } from "@/lib/gallery";
+import { getAlbumBySlug, getPhotoById } from "@/lib/gallery";
+import { toLightboxPhoto } from "@/lib/lightbox";
 
 type PhotoPageProps = {
   params: Promise<{ id: string }>;
@@ -31,6 +33,12 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
 
   const parentAlbum = photo.albums[0];
   const camera = [photo.cameraMake, photo.cameraModel].filter(Boolean).join(" ");
+  const album = parentAlbum ? await getAlbumBySlug(parentAlbum.slug) : null;
+  const viewerPhotos = album?.photos.length ? album.photos : [photo];
+  const viewerIndex = Math.max(
+    0,
+    viewerPhotos.findIndex((albumPhoto) => albumPhoto.id === photo.id),
+  );
 
   return (
     <main className="page-frame page-frame-main">
@@ -43,18 +51,20 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
       </header>
 
       <figure className="photo-stage">
-        {photo.detailUrl ? (
-          <ResponsivePhotoImage
-            photo={photo}
-            alt={photo.title ?? "相册照片"}
-            sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1488px) calc(100vw - 48px), 1440px"
-            preferredWidth={1600}
-            loading="eager"
-            fetchPriority="high"
-          />
-        ) : (
-          <PhotoPlaceholder index={Number.parseInt(photo.id.slice(0, 2), 16) || 0} />
-        )}
+        <PhotoLightboxStage photos={viewerPhotos.map(toLightboxPhoto)} initialIndex={viewerIndex}>
+          {photo.detailUrl ? (
+            <ResponsivePhotoImage
+              photo={photo}
+              alt={photo.title ?? "相册照片"}
+              sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1488px) calc(100vw - 48px), 1440px"
+              preferredWidth={1600}
+              loading="eager"
+              fetchPriority="high"
+            />
+          ) : (
+            <PhotoPlaceholder index={Number.parseInt(photo.id.slice(0, 2), 16) || 0} />
+          )}
+        </PhotoLightboxStage>
         <figcaption className="photo-stage-footer">
           <span>
             {photo.width} × {photo.height}

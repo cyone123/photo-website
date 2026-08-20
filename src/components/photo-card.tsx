@@ -17,6 +17,7 @@ export function PhotoCard({
     <Link
       className="photo-card"
       href={`/photos/${photo.id}`}
+      data-lightbox-index={index}
       style={{ "--photo-ratio": `${photo.width} / ${photo.height}` } as CSSProperties}
     >
       <div className="photo-card-media">

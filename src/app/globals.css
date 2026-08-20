@@ -559,8 +559,19 @@ h3 {
   background: var(--surface-soft);
 }
 
-.photo-stage > img,
-.photo-stage > .photo-placeholder {
+.photo-stage-open {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.photo-stage-open > img,
+.photo-stage-open > .photo-placeholder {
   width: 100%;
   max-height: 82vh;
   min-height: 280px;
@@ -568,8 +579,33 @@ h3 {
   object-fit: contain;
 }
 
-.photo-stage > img {
+.photo-stage-open > img {
   height: auto;
+}
+
+.photo-stage-open-label {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(0, 0, 0, 0.72);
+  padding: 9px 12px;
+  color: var(--on-dark);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  opacity: 0;
+  text-transform: uppercase;
+  transform: translateY(4px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.photo-stage-open:hover .photo-stage-open-label,
+.photo-stage-open:focus-visible .photo-stage-open-label {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .photo-stage-footer {
@@ -615,6 +651,213 @@ h3 {
   font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+/* ---------- 沉浸式照片查看器 ---------- */
+
+.photo-lightbox {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.98);
+  padding: 0;
+  color: var(--body);
+  overflow: hidden;
+}
+
+.photo-lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.96);
+}
+
+.photo-lightbox-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.photo-lightbox-header,
+.photo-lightbox-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
+}
+
+.photo-lightbox-header {
+  min-height: 72px;
+  padding-top: env(safe-area-inset-top);
+}
+
+.photo-lightbox-heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.photo-lightbox-heading strong {
+  overflow: hidden;
+  color: var(--on-dark);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-lightbox-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.photo-lightbox-icon,
+.photo-lightbox-nav {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(13, 13, 13, 0.74);
+  padding: 0;
+  color: var(--on-dark);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.photo-lightbox-icon:hover,
+.photo-lightbox-nav:hover {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(38, 38, 38, 0.9);
+}
+
+.photo-lightbox-icon:active,
+.photo-lightbox-nav:active {
+  transform: scale(0.94);
+}
+
+.photo-lightbox-icon svg,
+.photo-lightbox-nav svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.5;
+}
+
+.photo-lightbox-stage {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  padding-inline: 84px;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.photo-lightbox-stage > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: lightbox-photo-in 220ms ease-out;
+}
+
+.photo-lightbox-missing {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.photo-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  transform: translateY(-50%);
+}
+
+.photo-lightbox-nav:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.photo-lightbox-nav-previous {
+  left: 20px;
+}
+
+.photo-lightbox-nav-next {
+  right: 20px;
+}
+
+.photo-lightbox-footer {
+  min-height: 86px;
+  padding-top: 14px;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+.photo-lightbox-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.photo-lightbox-meta span + span::before {
+  margin-right: 18px;
+  color: var(--hairline);
+  content: "/";
+}
+
+.photo-lightbox-actions {
+  display: flex;
+  max-width: 52%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+}
+
+.photo-lightbox-actions p {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-lightbox-actions a {
+  flex-shrink: 0;
+  color: var(--on-dark);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+
+@keyframes lightbox-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ---------- 关于页 ---------- */
@@ -842,9 +1085,55 @@ h3 {
     gap: 12px;
   }
 
-  .photo-stage > img,
-  .photo-stage > .photo-placeholder {
+  .photo-stage-open > img,
+  .photo-stage-open > .photo-placeholder {
     min-height: 200px;
+  }
+
+  .photo-lightbox-header {
+    min-height: 60px;
+  }
+
+  .photo-lightbox-heading {
+    gap: 10px;
+  }
+
+  .photo-lightbox-stage {
+    padding-inline: 0;
+  }
+
+  .photo-lightbox-nav {
+    top: auto;
+    bottom: 12px;
+    width: 44px;
+    height: 44px;
+    transform: none;
+  }
+
+  .photo-lightbox-nav:active {
+    transform: scale(0.94);
+  }
+
+  .photo-lightbox-nav-previous {
+    left: 16px;
+  }
+
+  .photo-lightbox-nav-next {
+    right: 16px;
+  }
+
+  .photo-lightbox-footer {
+    min-height: 72px;
+    align-items: flex-end;
+  }
+
+  .photo-lightbox-meta span:nth-child(n + 3),
+  .photo-lightbox-actions p {
+    display: none;
+  }
+
+  .photo-lightbox-actions {
+    max-width: none;
   }
 }
 
