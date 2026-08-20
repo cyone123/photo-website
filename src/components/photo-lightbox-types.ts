@@ -10,5 +10,6 @@ export type LightboxPhoto = {
   sources: Array<{
     width: number;
     url: string;
+    format: string;
   }>;
 };

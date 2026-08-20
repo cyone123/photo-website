@@ -47,6 +47,11 @@ export default async function Home() {
                 preferredWidth={1600}
                 loading="eager"
                 fetchPriority="high"
+                objectPosition={
+                  featuredAlbum
+                    ? `${featuredAlbum.coverFocalX}% ${featuredAlbum.coverFocalY}%`
+                    : undefined
+                }
               />
             ) : (
               <PhotoPlaceholder index={0} />

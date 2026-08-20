@@ -5,6 +5,7 @@ import { getDb } from "@/db/client";
 import { albumPhotos, albums, photos } from "@/db/schema";
 
 export const GALLERY_CACHE_TAG = "gallery";
+export const ALBUM_PAGE_SIZE = 24;
 
 const GALLERY_CACHE_OPTIONS = {
   tags: [GALLERY_CACHE_TAG],
@@ -28,6 +29,7 @@ export interface GalleryPhoto {
   aspectRatio: number;
   title: string | null;
   description: string | null;
+  blurhash: string | null;
   takenAt: GalleryDate;
   cameraMake: string | null;
   cameraModel: string | null;
@@ -49,9 +51,35 @@ export interface GalleryAlbum {
   slug: string;
   title: string;
   description: string | null;
+  shootingContext: string | null;
   publishedAt: GalleryDate;
+  coverFocalX: number;
+  coverFocalY: number;
   photos: GalleryPhoto[];
   coverPhoto: GalleryPhoto | null;
+}
+
+export interface GalleryAlbumPhoto extends GalleryPhoto {
+  sequence: number;
+  chapterTitle: string | null;
+  chapterText: string | null;
+}
+
+export interface GalleryAlbumOverview {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  shootingContext: string | null;
+  publishedAt: GalleryDate;
+  photoCount: number;
+  coverFocalX: number;
+  coverFocalY: number;
+}
+
+export interface GalleryAlbumPhotoPage {
+  photos: GalleryAlbumPhoto[];
+  nextOffset: number | null;
 }
 
 export interface GalleryAlbumSummary {
@@ -59,8 +87,11 @@ export interface GalleryAlbumSummary {
   slug: string;
   title: string;
   description: string | null;
+  shootingContext: string | null;
   publishedAt: GalleryDate;
   photoCount: number;
+  coverFocalX: number;
+  coverFocalY: number;
   coverPhoto: GalleryPhoto | null;
 }
 
@@ -94,6 +125,7 @@ type PhotoWithVariants = {
   height: number;
   title: string | null;
   description: string | null;
+  blurhash: string | null;
   takenAt: Date | null;
   cameraMake: string | null;
   cameraModel: string | null;
@@ -130,6 +162,7 @@ function toGalleryPhoto(
     aspectRatio: photo.width / photo.height,
     title: photo.title,
     description: photo.description,
+    blurhash: photo.blurhash,
     takenAt: photo.takenAt,
     cameraMake: photo.cameraMake,
     cameraModel: photo.cameraModel,
@@ -183,7 +216,10 @@ function toGalleryAlbum(album: RawAlbum): GalleryAlbum {
     slug: album.slug,
     title: album.title,
     description: album.description,
+    shootingContext: album.shootingContext,
     publishedAt: album.publishedAt,
+    coverFocalX: album.coverFocalX,
+    coverFocalY: album.coverFocalY,
     photos: albumPhotosList,
     coverPhoto:
       albumPhotosList.find((photo) => photo.id === album.coverPhotoId) ??
@@ -200,9 +236,12 @@ async function queryPublishedAlbumSummaries(limit?: number): Promise<GalleryAlbu
       slug: albums.slug,
       title: albums.title,
       description: albums.description,
+      shootingContext: albums.shootingContext,
       publishedAt: albums.publishedAt,
       createdAt: albums.createdAt,
       coverPhotoId: albums.coverPhotoId,
+      coverFocalX: albums.coverFocalX,
+      coverFocalY: albums.coverFocalY,
       photoCount: count(photos.id).mapWith(Number),
     })
     .from(albums)
@@ -231,10 +270,102 @@ async function queryPublishedAlbumSummaries(limit?: number): Promise<GalleryAlbu
     slug: album.slug,
     title: album.title,
     description: album.description,
+    shootingContext: album.shootingContext,
     publishedAt: album.publishedAt,
     photoCount: album.photoCount,
+    coverFocalX: album.coverFocalX,
+    coverFocalY: album.coverFocalY,
     coverPhoto: album.coverPhotoId ? (coverPhotoById.get(album.coverPhotoId) ?? null) : null,
   }));
+}
+
+async function queryPublishedAlbumOverview(slug: string): Promise<GalleryAlbumOverview | null> {
+  const db = getDb();
+  const album = await db.query.albums.findFirst({
+    where: and(eq(albums.slug, slug), eq(albums.status, "PUBLISHED")),
+  });
+
+  if (!album) {
+    return null;
+  }
+
+  const [photoCount] = await db
+    .select({ value: count(photos.id).mapWith(Number) })
+    .from(albumPhotos)
+    .innerJoin(photos, and(eq(photos.id, albumPhotos.photoId), eq(photos.status, "READY")))
+    .where(eq(albumPhotos.albumId, album.id));
+
+  return {
+    id: album.id,
+    slug: album.slug,
+    title: album.title,
+    description: album.description,
+    shootingContext: album.shootingContext,
+    publishedAt: album.publishedAt,
+    photoCount: photoCount?.value ?? 0,
+    coverFocalX: album.coverFocalX,
+    coverFocalY: album.coverFocalY,
+  };
+}
+
+async function queryAlbumPhotoPage(
+  slug: string,
+  offset: number,
+  limit: number,
+): Promise<GalleryAlbumPhotoPage | null> {
+  const db = getDb();
+  const album = await db.query.albums.findFirst({
+    columns: { id: true },
+    where: and(eq(albums.slug, slug), eq(albums.status, "PUBLISHED")),
+  });
+
+  if (!album) {
+    return null;
+  }
+
+  const entries = await db
+    .select({
+      photoId: albumPhotos.photoId,
+      chapterTitle: albumPhotos.chapterTitle,
+      chapterText: albumPhotos.chapterText,
+    })
+    .from(albumPhotos)
+    .innerJoin(photos, and(eq(photos.id, albumPhotos.photoId), eq(photos.status, "READY")))
+    .where(eq(albumPhotos.albumId, album.id))
+    .orderBy(asc(albumPhotos.sortOrder), asc(albumPhotos.photoId))
+    .offset(offset)
+    .limit(limit + 1);
+  const visibleEntries = entries.slice(0, limit);
+  const photoIds = visibleEntries.map((entry) => entry.photoId);
+  const pagePhotos =
+    photoIds.length > 0
+      ? await db.query.photos.findMany({
+          where: inArray(photos.id, photoIds),
+          with: { variants: true },
+        })
+      : [];
+  const photoById = new Map(pagePhotos.map((photo) => [photo.id, photo]));
+  const galleryPhotos = visibleEntries.flatMap((entry, index) => {
+    const photo = photoById.get(entry.photoId);
+
+    if (!photo) {
+      return [];
+    }
+
+    return [
+      {
+        ...toGalleryPhoto(photo as RawPhoto),
+        sequence: offset + index + 1,
+        chapterTitle: entry.chapterTitle,
+        chapterText: entry.chapterText,
+      },
+    ];
+  });
+
+  return {
+    photos: galleryPhotos,
+    nextOffset: entries.length > limit ? offset + visibleEntries.length : null,
+  };
 }
 
 const getCachedPublishedAlbumSummaries = unstable_cache(
@@ -245,6 +376,26 @@ const getCachedPublishedAlbumSummaries = unstable_cache(
 
 export function getPublishedAlbumSummaries(limit?: number) {
   return getCachedPublishedAlbumSummaries(limit);
+}
+
+const getCachedPublishedAlbumOverview = unstable_cache(
+  queryPublishedAlbumOverview,
+  ["published-album-overview"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getPublishedAlbumOverview(slug: string) {
+  return getCachedPublishedAlbumOverview(slug);
+}
+
+const getCachedAlbumPhotoPage = unstable_cache(
+  queryAlbumPhotoPage,
+  ["published-album-photo-page"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export function getAlbumPhotoPage(slug: string, offset = 0, limit = ALBUM_PAGE_SIZE) {
+  return getCachedAlbumPhotoPage(slug, offset, limit);
 }
 
 const getCachedAlbumBySlug = unstable_cache(

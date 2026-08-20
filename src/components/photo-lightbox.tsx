@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- R2 responsive variants are selected directly with srcset inside the fullscreen viewer. */
-
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -34,6 +32,14 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const photo = activeIndex === null ? null : photos[activeIndex];
   const canNavigate = photos.length > 1;
+  const avifSourceSet = photo?.sources
+    .filter((source) => source.format === "avif")
+    .map((source) => `${source.url} ${source.width}w`)
+    .join(", ");
+  const webpSourceSet = photo?.sources
+    .filter((source) => source.format === "webp")
+    .map((source) => `${source.url} ${source.width}w`)
+    .join(", ");
 
   const close = useCallback(() => {
     onActiveIndexChange(null);
@@ -105,6 +111,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
       const image = new Image();
       image.src = adjacentPhoto.fallbackUrl;
       image.srcset = adjacentPhoto.sources
+        .filter((source) => source.format === "webp")
         .map((source) => `${source.url} ${source.width}w`)
         .join(", ");
       image.sizes = "100vw";
@@ -197,14 +204,21 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
             onPointerUp={handlePointerUp}
           >
             {photo.fallbackUrl ? (
-              <img
-                key={photo.id}
-                src={photo.fallbackUrl}
-                srcSet={photo.sources.map((source) => `${source.url} ${source.width}w`).join(", ")}
-                sizes="100vw"
-                alt={photo.title}
-                decoding="async"
-              />
+              <picture key={photo.id}>
+                {avifSourceSet ? (
+                  <source type="image/avif" srcSet={avifSourceSet} sizes="100vw" />
+                ) : null}
+                {webpSourceSet ? (
+                  <source type="image/webp" srcSet={webpSourceSet} sizes="100vw" />
+                ) : null}
+                <img
+                  src={photo.fallbackUrl}
+                  srcSet={webpSourceSet}
+                  sizes="100vw"
+                  alt={photo.title}
+                  decoding="async"
+                />
+              </picture>
             ) : (
               <div className="photo-lightbox-missing">暂无可用图片</div>
             )}
@@ -253,16 +267,18 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
 export function PhotoLightboxGallery({
   photos,
   children,
+  className = "photo-grid",
 }: {
   photos: LightboxPhoto[];
   children: ReactNode;
+  className?: string;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   return (
     <>
       <div
-        className="photo-grid"
+        className={className}
         onClickCapture={(event) => {
           if (
             event.button !== 0 ||

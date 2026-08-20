@@ -79,7 +79,10 @@ export const albums = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     description: text("description"),
+    shootingContext: text("shooting_context"),
     coverPhotoId: uuid("cover_photo_id").references(() => photos.id, { onDelete: "set null" }),
+    coverFocalX: integer("cover_focal_x").default(50).notNull(),
+    coverFocalY: integer("cover_focal_y").default(50).notNull(),
     status: albumStatusEnum("status").default("DRAFT").notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
@@ -98,6 +101,8 @@ export const albumPhotos = pgTable(
       .notNull()
       .references(() => photos.id, { onDelete: "cascade" }),
     sortOrder: integer("sort_order").notNull().default(0),
+    chapterTitle: text("chapter_title"),
+    chapterText: text("chapter_text"),
   },
   (table) => [
     primaryKey({ columns: [table.albumId, table.photoId] }),

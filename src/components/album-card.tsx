@@ -15,6 +15,7 @@ export function AlbumCard({ album, index = 0 }: { album: GalleryAlbumSummary; in
             sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) 50vw, 33vw"
             preferredWidth={640}
             loading="lazy"
+            objectPosition={`${album.coverFocalX}% ${album.coverFocalY}%`}
           />
         ) : (
           <PhotoPlaceholder index={index} />

@@ -1,15 +1,34 @@
 import type { LightboxPhoto } from "@/components/photo-lightbox-types";
-import { formatPhotoDate, type GalleryPhoto } from "@/lib/gallery";
+import type { GalleryDate, GalleryPhoto } from "@/lib/gallery";
+
+function formatPhotoDate(value: GalleryDate) {
+  if (!value) {
+    return "未记录日期";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "未记录日期";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
 
 export function toLightboxPhoto(photo: GalleryPhoto): LightboxPhoto {
   const sources = photo.variants
     .filter(
       (variant): variant is typeof variant & { url: string } =>
-        variant.format === "webp" && Boolean(variant.url),
+        (variant.format === "avif" || variant.format === "webp") && Boolean(variant.url),
     )
     .sort((left, right) => left.width - right.width)
-    .map((variant) => ({ width: variant.width, url: variant.url }));
-  const fallback = sources.find((source) => source.width >= 1600) ?? sources.at(-1) ?? null;
+    .map((variant) => ({ width: variant.width, url: variant.url, format: variant.format }));
+  const webpSources = sources.filter((source) => source.format === "webp");
+  const fallback = webpSources.find((source) => source.width >= 1600) ?? webpSources.at(-1) ?? null;
   const camera = [photo.cameraMake, photo.cameraModel].filter(Boolean).join(" ");
 
   return {

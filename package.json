@@ -23,6 +23,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1113.0",
     "@neondatabase/serverless": "^1.1.0",
+    "blurhash": "^2.0.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "exifr": "^7.1.3",

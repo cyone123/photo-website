@@ -25,7 +25,7 @@ export function PhotoCard({
           <ResponsivePhotoImage
             photo={photo}
             alt={photo.title ?? "相册照片"}
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 33vw"
+            sizes="(max-width: 480px) calc(100vw - 32px), (max-width: 1024px) 50vw, 33vw"
             preferredWidth={640}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}

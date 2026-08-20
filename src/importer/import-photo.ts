@@ -5,7 +5,7 @@ import { getDb } from "@/db/client";
 import { albumPhotos, albums, photoVariants, photos } from "@/db/schema";
 import { originalObjectKey, publicVariantObjectKey } from "@/importer/object-key";
 import { inspectPhotoFile, type InspectedPhoto } from "@/importer/inspect-image";
-import { generatePublicVariants } from "@/importer/variants";
+import { generatePhotoBlurhash, generatePublicVariants } from "@/importer/variants";
 import { getR2Buckets, putR2Object } from "@/storage/r2";
 
 type PhotoRecord = typeof photos.$inferSelect;
@@ -196,7 +196,7 @@ async function uploadAssets(
   for (const variant of variants) {
     await putR2Object({
       bucket: buckets.publicBucket,
-      key: publicVariantObjectKey(photo.id, variant.targetWidth),
+      key: publicVariantObjectKey(photo.id, variant.targetWidth, variant.format),
       body: variant.buffer,
       contentType: variant.mimeType,
       cacheControl: "public, max-age=31536000, immutable",
@@ -219,7 +219,7 @@ async function saveVariants(
         height: variant.height,
         format: variant.format,
         mimeType: variant.mimeType,
-        objectKey: publicVariantObjectKey(photoId, variant.targetWidth),
+        objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
         byteSize: variant.byteSize,
       })
       .onConflictDoUpdate({
@@ -227,17 +227,17 @@ async function saveVariants(
         set: {
           height: variant.height,
           mimeType: variant.mimeType,
-          objectKey: publicVariantObjectKey(photoId, variant.targetWidth),
+          objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
           byteSize: variant.byteSize,
         },
       });
   }
 }
 
-async function markPhotoReady(photoId: string) {
+async function markPhotoReady(photoId: string, blurhash: string) {
   await getDb()
     .update(photos)
-    .set({ status: "READY", failureMessage: null, updatedAt: new Date() })
+    .set({ status: "READY", blurhash, failureMessage: null, updatedAt: new Date() })
     .where(eq(photos.id, photoId));
 }
 
@@ -288,10 +288,10 @@ async function linkPhotoToAlbum(album: AlbumRecord, photoId: string) {
 
 export async function dryRunPhotoImport(options: ImportPhotoOptions): Promise<ImportPhotoResult> {
   const source = await inspectPhotoFile(options.filePath);
-  const variants = await generatePublicVariants(
-    source.buffer,
-    Math.max(source.width, source.height),
-  );
+  const [variants] = await Promise.all([
+    generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
+    generatePhotoBlurhash(source.buffer),
+  ]);
 
   return {
     status: "dry-run",
@@ -325,15 +325,15 @@ export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPh
     };
   }
 
-  const variants = await generatePublicVariants(
-    source.buffer,
-    Math.max(source.width, source.height),
-  );
+  const [variants, blurhash] = await Promise.all([
+    generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
+    generatePhotoBlurhash(source.buffer),
+  ]);
 
   try {
     await uploadAssets(prepared.photo, source, variants);
     await saveVariants(prepared.photo.id, variants);
-    await markPhotoReady(prepared.photo.id);
+    await markPhotoReady(prepared.photo.id, blurhash);
   } catch (error) {
     await markPhotoFailed(prepared.photo.id, error);
     throw error;

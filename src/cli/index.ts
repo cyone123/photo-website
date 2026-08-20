@@ -4,6 +4,7 @@ import { loadProjectEnv } from "@/config/load-env";
 import { collectImageFiles } from "@/importer/file-utils";
 import { dryRunPhotoImport, importPhoto } from "@/importer/import-photo";
 import { inspectImage } from "@/importer/inspect-image";
+import { setAlbumChapter, updateAlbum } from "@/importer/manage-album";
 import { revalidatePublishedGallery } from "@/importer/revalidate-site";
 
 function printHelp() {
@@ -12,10 +13,13 @@ function printHelp() {
 Usage:
   pnpm photo inspect <image-path>
   pnpm photo import <file-or-directory>... --album <album-slug> [options]
+  pnpm photo album update <album-slug> [options]
+  pnpm photo album chapter <album-slug> --photo <photo-id> [options]
 
 Commands:
   inspect   Read image dimensions and EXIF metadata without uploading.
   import    Import photos into R2 and PostgreSQL.
+  album     Edit album context, cover focus and chapter copy.
 
 Import options:
   --album <slug>          Album to create or use; required.
@@ -24,9 +28,23 @@ Import options:
   --force                 Re-upload an already READY photo.
   --help                  Show this help.
 
+Album update options:
+  --description <text>    Public album summary.
+  --context <text>        Shooting background shown before the gallery.
+  --cover <photo-id>      Cover photo; it must already belong to the album.
+  --focus-x <0-100>       Horizontal cover focal point.
+  --focus-y <0-100>       Vertical cover focal point.
+
+Album chapter options:
+  --photo <photo-id>      First photo in the chapter; required.
+  --title <text>          Chapter heading.
+  --text <text>           Chapter introduction.
+
 Examples:
   pnpm photo import ./photos --album japan-2026 --album-title "Japan 2026"
   pnpm photo import ./photo.jpg --album favorites --dry-run
+  pnpm photo album update japan-2026 --context "雨季的东京" --focus-x 42 --focus-y 30
+  pnpm photo album chapter japan-2026 --photo <uuid> --title "清晨" --text "从第一班电车开始。"
 `);
 }
 
@@ -173,6 +191,66 @@ async function runImport(args: string[]) {
   }
 }
 
+function optionValue(args: string[], name: string) {
+  const index = args.indexOf(name);
+
+  if (index < 0) {
+    return undefined;
+  }
+
+  const value = args[index + 1];
+
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`${name} requires a value.`);
+  }
+
+  return value;
+}
+
+async function runAlbum(args: string[]) {
+  const [action, slug, ...options] = args;
+
+  if (!action || !slug || (action !== "update" && action !== "chapter")) {
+    throw new Error("Use `album update <slug>` or `album chapter <slug>`. ");
+  }
+
+  loadProjectEnv();
+
+  if (action === "update") {
+    const focalX = optionValue(options, "--focus-x");
+    const focalY = optionValue(options, "--focus-y");
+    const updated = await updateAlbum({
+      slug,
+      description: optionValue(options, "--description"),
+      shootingContext: optionValue(options, "--context"),
+      coverPhotoId: optionValue(options, "--cover"),
+      coverFocalX: focalX === undefined ? undefined : Number(focalX),
+      coverFocalY: focalY === undefined ? undefined : Number(focalY),
+    });
+    console.log(`[album]     Updated ${updated.slug}.`);
+  } else {
+    const photoId = optionValue(options, "--photo");
+
+    if (!photoId) {
+      throw new Error("--photo is required for an album chapter.");
+    }
+
+    await setAlbumChapter({
+      slug,
+      photoId,
+      title: optionValue(options, "--title"),
+      text: optionValue(options, "--text"),
+    });
+    console.log(`[chapter]   Updated chapter before ${photoId}.`);
+  }
+
+  try {
+    await revalidatePublishedGallery();
+  } catch (error) {
+    console.warn(`[cache]     ${formatError(error)} The hourly fallback remains active.`);
+  }
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2);
 
@@ -194,6 +272,11 @@ async function main() {
 
   if (command === "import") {
     await runImport(args);
+    return;
+  }
+
+  if (command === "album") {
+    await runAlbum(args);
     return;
   }
 

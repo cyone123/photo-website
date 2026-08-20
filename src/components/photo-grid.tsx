@@ -3,11 +3,17 @@ import { toLightboxPhoto } from "@/lib/lightbox";
 import { PhotoCard } from "./photo-card";
 import { PhotoLightboxGallery } from "./photo-lightbox";
 
-export function PhotoGrid({ photos }: { photos: GalleryPhoto[] }) {
+export function PhotoGrid({
+  photos,
+  priorityCount = 0,
+}: {
+  photos: GalleryPhoto[];
+  priorityCount?: number;
+}) {
   return (
     <PhotoLightboxGallery photos={photos.map(toLightboxPhoto)}>
       {photos.map((photo, index) => (
-        <PhotoCard key={photo.id} photo={photo} index={index} priority={index < 2} />
+        <PhotoCard key={photo.id} photo={photo} index={index} priority={index < priorityCount} />
       ))}
     </PhotoLightboxGallery>
   );
