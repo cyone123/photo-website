@@ -31,6 +31,8 @@ pnpm db:generate
 pnpm photo --help
 pnpm photo inspect path/to/photo.jpg
 pnpm photo import path/to/photos --album japan-2026 --album-title "Japan 2026"
+pnpm photo import path/to/photo.jpg --album japan-2026 --title "雪场日落"
+pnpm photo update <photo-id> --title "雪场日落"
 pnpm photo import path/to/photos --album japan-2026 --dry-run
 pnpm photo album update japan-2026 --context "雨季的东京" --focus-x 42 --focus-y 30
 pnpm photo album chapter japan-2026 --photo <photo-id> --title "清晨" --text "从第一班电车开始。"
@@ -52,14 +54,24 @@ pnpm photo album chapter japan-2026 --photo <photo-id> --title "清晨" --text "
 # 先只在本地解析、压缩，不写数据库和 R2
 pnpm photo import ./photos --album japan-2026 --dry-run
 
-# 正式导入；相册不存在时会自动创建并发布
-pnpm photo import ./photos --album japan-2026 --album-title "Japan 2026"
+# 正式导入；相册不存在时会自动创建并发布，照片标题默认取原文件名（不含扩展名）
+pnpm photo import ./photos --album jiangjunshan-2026 --album-title "将军山滑雪之旅"
+
+# 导入单张照片时指定自定义标题
+pnpm photo import ./photos/sunset.jpg --album jiangjunshan-2026 --title "雪场日落"
 
 # 强制重新上传已经 READY 的照片
 pnpm photo import ./photos --album japan-2026 --force
 ```
 
 `--force` 也可用于为旧照片补齐 AVIF 变体和 BlurHash。相册页每次加载 24 张照片，滚动接近底部时会继续加载，并在返回相册时恢复已加载范围和滚动位置。
+
+`--album` 是 URL 中使用的相册标识，建议使用简短的英文字母、数字和连字符；`--album-title` 才是页面展示的中文相册名。重新导入同一批旧照片时，如果标题仍为空，会按原文件名自动补齐，不会重复上传。已有照片也可以单独改名：
+
+```bash
+pnpm photo update <photo-id> --title "雪场日落"
+pnpm photo update <photo-id> --title "雪场日落" --description "将军山，日落前。"
+```
 
 ## 相册叙事与封面焦点
 

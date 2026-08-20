@@ -8,6 +8,7 @@ import { PhotoPlaceholder } from "@/components/photo-placeholder";
 import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { SectionHeading } from "@/components/section-heading";
 import { formatPhotoYear, getLatestPhotos, getPublishedAlbumSummaries } from "@/lib/gallery";
+import { albumHref } from "@/lib/routes";
 
 export const metadata: Metadata = {
   title: "光的档案 · Personal Photo Archive",
@@ -22,7 +23,7 @@ export default async function Home() {
   const featuredAlbum = albums[0];
   const featuredPhoto = featuredAlbum?.coverPhoto ?? latestPhotos[0] ?? null;
   const featuredHref = featuredAlbum
-    ? `/albums/${featuredAlbum.slug}`
+    ? albumHref(featuredAlbum.slug)
     : featuredPhoto
       ? `/photos/${featuredPhoto.id}`
       : null;

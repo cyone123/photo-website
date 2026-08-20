@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import path from "node:path";
 import { and, eq, isNull, max } from "drizzle-orm";
 import { readImportEnv } from "@/config/env";
 import { getDb } from "@/db/client";
@@ -15,6 +16,7 @@ export interface ImportPhotoOptions {
   filePath: string;
   albumSlug: string;
   albumTitle?: string;
+  photoTitle?: string;
   dryRun?: boolean;
   force?: boolean;
 }
@@ -95,7 +97,39 @@ async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
   }
 }
 
-async function preparePhoto(photo: InspectedPhoto, force: boolean) {
+function photoTitleFromFilePath(filePath: string) {
+  const title = path.parse(filePath).name.trim();
+  return title || null;
+}
+
+function resolvedPhotoTitle(filePath: string, requestedTitle?: string) {
+  if (requestedTitle !== undefined) {
+    const title = requestedTitle.trim();
+
+    if (!title) {
+      throw new Error("Photo title cannot be empty.");
+    }
+
+    return title;
+  }
+
+  return photoTitleFromFilePath(filePath);
+}
+
+function titleUpdate(
+  currentTitle: string | null,
+  nextTitle: string | null,
+  replaceExisting: boolean,
+) {
+  return nextTitle && (replaceExisting || !currentTitle) ? { title: nextTitle } : {};
+}
+
+async function preparePhoto(
+  photo: InspectedPhoto,
+  force: boolean,
+  title: string | null,
+  replaceTitle: boolean,
+) {
   const db = getDb();
   const contentHash = sha256(photo.buffer);
   const existing = await db
@@ -106,12 +140,29 @@ async function preparePhoto(photo: InspectedPhoto, force: boolean) {
 
   if (existing[0]) {
     if (existing[0].status === "READY" && !force) {
-      return { photo: existing[0], alreadyReady: true };
+      const titleValues = titleUpdate(existing[0].title, title, replaceTitle);
+
+      if (Object.keys(titleValues).length === 0) {
+        return { photo: existing[0], alreadyReady: true };
+      }
+
+      const [updated] = await db
+        .update(photos)
+        .set({ ...titleValues, updatedAt: new Date() })
+        .where(eq(photos.id, existing[0].id))
+        .returning();
+
+      return { photo: updated, alreadyReady: true };
     }
 
     const [updated] = await db
       .update(photos)
-      .set({ status: "PROCESSING", failureMessage: null, updatedAt: new Date() })
+      .set({
+        status: "PROCESSING",
+        failureMessage: null,
+        ...titleUpdate(existing[0].title, title, replaceTitle),
+        updatedAt: new Date(),
+      })
       .where(eq(photos.id, existing[0].id))
       .returning();
 
@@ -138,6 +189,7 @@ async function preparePhoto(photo: InspectedPhoto, force: boolean) {
     latitude: photo.latitude?.toString() ?? null,
     longitude: photo.longitude?.toString() ?? null,
     rawExif: photo.rawExif,
+    title,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -161,12 +213,29 @@ async function preparePhoto(photo: InspectedPhoto, force: boolean) {
     }
 
     if (raced[0].status === "READY" && !force) {
-      return { photo: raced[0], alreadyReady: true };
+      const titleValues = titleUpdate(raced[0].title, title, replaceTitle);
+
+      if (Object.keys(titleValues).length === 0) {
+        return { photo: raced[0], alreadyReady: true };
+      }
+
+      const [updated] = await db
+        .update(photos)
+        .set({ ...titleValues, updatedAt: new Date() })
+        .where(eq(photos.id, raced[0].id))
+        .returning();
+
+      return { photo: updated, alreadyReady: true };
     }
 
     const [updated] = await db
       .update(photos)
-      .set({ status: "PROCESSING", failureMessage: null, updatedAt: new Date() })
+      .set({
+        status: "PROCESSING",
+        failureMessage: null,
+        ...titleUpdate(raced[0].title, title, replaceTitle),
+        updatedAt: new Date(),
+      })
       .where(eq(photos.id, raced[0].id))
       .returning();
 
@@ -311,7 +380,13 @@ export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPh
   readImportEnv();
   const albumSlug = normalizeAlbumSlug(options.albumSlug);
   const album = await ensureAlbum(albumSlug, options.albumTitle);
-  const prepared = await preparePhoto(source, options.force ?? false);
+  const title = resolvedPhotoTitle(source.filePath, options.photoTitle);
+  const prepared = await preparePhoto(
+    source,
+    options.force ?? false,
+    title,
+    options.photoTitle !== undefined,
+  );
 
   if (prepared.alreadyReady) {
     await linkPhotoToAlbum(album, prepared.photo.id);

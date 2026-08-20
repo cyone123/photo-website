@@ -8,6 +8,7 @@ import { PhotoPlaceholder } from "@/components/photo-placeholder";
 import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { getAlbumBySlug, getPhotoById } from "@/lib/gallery";
 import { toLightboxPhoto } from "@/lib/lightbox";
+import { albumHref } from "@/lib/routes";
 
 type PhotoPageProps = {
   params: Promise<{ id: string }>;
@@ -71,7 +72,7 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
             {camera ? ` · ${camera}` : ""}
           </span>
           {parentAlbum ? (
-            <Link href={`/albums/${parentAlbum.slug}`}>返回 {parentAlbum.title} →</Link>
+            <Link href={albumHref(parentAlbum.slug)}>返回 {parentAlbum.title} →</Link>
           ) : null}
         </figcaption>
       </figure>

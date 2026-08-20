@@ -5,6 +5,7 @@ import { collectImageFiles } from "@/importer/file-utils";
 import { dryRunPhotoImport, importPhoto } from "@/importer/import-photo";
 import { inspectImage } from "@/importer/inspect-image";
 import { setAlbumChapter, updateAlbum } from "@/importer/manage-album";
+import { updatePhoto } from "@/importer/manage-photo";
 import { revalidatePublishedGallery } from "@/importer/revalidate-site";
 
 function printHelp() {
@@ -13,20 +14,27 @@ function printHelp() {
 Usage:
   pnpm photo inspect <image-path>
   pnpm photo import <file-or-directory>... --album <album-slug> [options]
+  pnpm photo update <photo-id> [options]
   pnpm photo album update <album-slug> [options]
   pnpm photo album chapter <album-slug> --photo <photo-id> [options]
 
 Commands:
   inspect   Read image dimensions and EXIF metadata without uploading.
   import    Import photos into R2 and PostgreSQL.
+  update    Edit an existing photo title or description.
   album     Edit album context, cover focus and chapter copy.
 
 Import options:
   --album <slug>          Album to create or use; required.
   --album-title <title>  Title used when the album is created.
+  --title <title>         Custom title for one photo; defaults to its filename.
   --dry-run               Parse and process locally without database or R2 writes.
   --force                 Re-upload an already READY photo.
   --help                  Show this help.
+
+Photo update options:
+  --title <title>         Public photo title.
+  --description <text>    Public photo description.
 
 Album update options:
   --description <text>    Public album summary.
@@ -42,7 +50,9 @@ Album chapter options:
 
 Examples:
   pnpm photo import ./photos --album japan-2026 --album-title "Japan 2026"
+  pnpm photo import ./photo.jpg --album favorites --title "Snow at dusk"
   pnpm photo import ./photo.jpg --album favorites --dry-run
+  pnpm photo update <uuid> --title "Snow at dusk"
   pnpm photo album update japan-2026 --context "雨季的东京" --focus-x 42 --focus-y 30
   pnpm photo album chapter japan-2026 --photo <uuid> --title "清晨" --text "从第一班电车开始。"
 `);
@@ -52,6 +62,7 @@ interface ImportArguments {
   inputPaths: string[];
   albumSlug: string;
   albumTitle?: string;
+  photoTitle?: string;
   dryRun: boolean;
   force: boolean;
 }
@@ -60,6 +71,7 @@ function parseImportArguments(args: string[]): ImportArguments | null {
   const inputPaths: string[] = [];
   let albumSlug: string | undefined;
   let albumTitle: string | undefined;
+  let photoTitle: string | undefined;
   let dryRun = false;
   let force = false;
 
@@ -80,7 +92,7 @@ function parseImportArguments(args: string[]): ImportArguments | null {
       continue;
     }
 
-    if (arg === "--album" || arg === "--album-title") {
+    if (arg === "--album" || arg === "--album-title" || arg === "--title") {
       const value = args[index + 1];
 
       if (!value || value.startsWith("--")) {
@@ -89,8 +101,10 @@ function parseImportArguments(args: string[]): ImportArguments | null {
 
       if (arg === "--album") {
         albumSlug = value;
-      } else {
+      } else if (arg === "--album-title") {
         albumTitle = value;
+      } else {
+        photoTitle = value;
       }
 
       index += 1;
@@ -108,7 +122,7 @@ function parseImportArguments(args: string[]): ImportArguments | null {
     throw new Error("--album is required for photo import.");
   }
 
-  return { inputPaths, albumSlug, albumTitle, dryRun, force };
+  return { inputPaths, albumSlug, albumTitle, photoTitle, dryRun, force };
 }
 
 function formatError(error: unknown) {
@@ -129,6 +143,10 @@ async function runImport(args: string[]) {
     throw new Error("No supported image files were found.");
   }
 
+  if (parsed.photoTitle !== undefined && files.length !== 1) {
+    throw new Error("--title can only be used when importing exactly one photo.");
+  }
+
   if (!parsed.dryRun) {
     loadProjectEnv();
     readImportEnv();
@@ -147,6 +165,7 @@ async function runImport(args: string[]) {
             filePath,
             albumSlug: parsed.albumSlug,
             albumTitle: parsed.albumTitle,
+            photoTitle: parsed.photoTitle,
             dryRun: true,
             force: parsed.force,
           })
@@ -154,6 +173,7 @@ async function runImport(args: string[]) {
             filePath,
             albumSlug: parsed.albumSlug,
             albumTitle: parsed.albumTitle,
+            photoTitle: parsed.photoTitle,
             force: parsed.force,
           });
 
@@ -205,6 +225,28 @@ function optionValue(args: string[], name: string) {
   }
 
   return value;
+}
+
+async function runPhotoUpdate(args: string[]) {
+  const [id, ...options] = args;
+
+  if (!id) {
+    throw new Error("Photo id is required.");
+  }
+
+  loadProjectEnv();
+  const updated = await updatePhoto({
+    id,
+    title: optionValue(options, "--title"),
+    description: optionValue(options, "--description"),
+  });
+  console.log(`[photo]     Updated ${updated.id}: ${updated.title ?? "untitled"}.`);
+
+  try {
+    await revalidatePublishedGallery();
+  } catch (error) {
+    console.warn(`[cache]     ${formatError(error)} The hourly fallback remains active.`);
+  }
 }
 
 async function runAlbum(args: string[]) {
@@ -272,6 +314,11 @@ async function main() {
 
   if (command === "import") {
     await runImport(args);
+    return;
+  }
+
+  if (command === "update") {
+    await runPhotoUpdate(args);
     return;
   }
 
