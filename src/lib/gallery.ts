@@ -40,6 +40,8 @@ export interface GalleryPhoto {
   iso: number | null;
   latitude: string | null;
   longitude: string | null;
+  locationCity: string | null;
+  locationDistrict: string | null;
   previewUrl: string | null;
   detailUrl: string | null;
   variants: GalleryVariant[];
@@ -136,6 +138,8 @@ type PhotoWithVariants = {
   iso: number | null;
   latitude: string | null;
   longitude: string | null;
+  locationCity: string | null;
+  locationDistrict: string | null;
   variants: Array<{
     width: number;
     height: number;
@@ -173,6 +177,8 @@ function toGalleryPhoto(
     iso: photo.iso,
     latitude: photo.latitude,
     longitude: photo.longitude,
+    locationCity: photo.locationCity,
+    locationDistrict: photo.locationDistrict,
     previewUrl: preview?.url ?? null,
     detailUrl: detail?.url ?? null,
     variants,

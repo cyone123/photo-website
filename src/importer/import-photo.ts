@@ -6,6 +6,7 @@ import { getDb } from "@/db/client";
 import { albumPhotos, albums, photoVariants, photos } from "@/db/schema";
 import { originalObjectKey, publicVariantObjectKey } from "@/importer/object-key";
 import { inspectPhotoFile, type InspectedPhoto } from "@/importer/inspect-image";
+import { reverseGeocodePhotoLocation, type PhotoLocation } from "@/importer/reverse-geocode";
 import { generatePhotoBlurhash, generatePublicVariants } from "@/importer/variants";
 import { getR2Buckets, putR2Object } from "@/storage/r2";
 
@@ -124,11 +125,37 @@ function titleUpdate(
   return nextTitle && (replaceExisting || !currentTitle) ? { title: nextTitle } : {};
 }
 
+function locationUpdate(current: PhotoRecord, next: PhotoLocation) {
+  return {
+    ...(next.city && !current.locationCity ? { locationCity: next.city } : {}),
+    ...(next.district && !current.locationDistrict ? { locationDistrict: next.district } : {}),
+  };
+}
+
+async function resolvePhotoLocation(photo: InspectedPhoto): Promise<PhotoLocation> {
+  const embedded = {
+    city: photo.locationCity,
+    district: photo.locationDistrict,
+  };
+
+  if (embedded.city && embedded.district) {
+    return embedded;
+  }
+
+  const geocoded = await reverseGeocodePhotoLocation(photo.latitude, photo.longitude);
+
+  return {
+    city: embedded.city ?? geocoded.city,
+    district: embedded.district ?? geocoded.district,
+  };
+}
+
 async function preparePhoto(
   photo: InspectedPhoto,
   force: boolean,
   title: string | null,
   replaceTitle: boolean,
+  location: PhotoLocation,
 ) {
   const db = getDb();
   const contentHash = sha256(photo.buffer);
@@ -141,14 +168,16 @@ async function preparePhoto(
   if (existing[0]) {
     if (existing[0].status === "READY" && !force) {
       const titleValues = titleUpdate(existing[0].title, title, replaceTitle);
+      const locationValues = locationUpdate(existing[0], location);
+      const updateValues = { ...titleValues, ...locationValues };
 
-      if (Object.keys(titleValues).length === 0) {
+      if (Object.keys(updateValues).length === 0) {
         return { photo: existing[0], alreadyReady: true };
       }
 
       const [updated] = await db
         .update(photos)
-        .set({ ...titleValues, updatedAt: new Date() })
+        .set({ ...updateValues, updatedAt: new Date() })
         .where(eq(photos.id, existing[0].id))
         .returning();
 
@@ -161,6 +190,7 @@ async function preparePhoto(
         status: "PROCESSING",
         failureMessage: null,
         ...titleUpdate(existing[0].title, title, replaceTitle),
+        ...locationUpdate(existing[0], location),
         updatedAt: new Date(),
       })
       .where(eq(photos.id, existing[0].id))
@@ -188,6 +218,8 @@ async function preparePhoto(
     iso: photo.iso,
     latitude: photo.latitude?.toString() ?? null,
     longitude: photo.longitude?.toString() ?? null,
+    locationCity: location.city,
+    locationDistrict: location.district,
     rawExif: photo.rawExif,
     title,
     createdAt: new Date(),
@@ -214,14 +246,16 @@ async function preparePhoto(
 
     if (raced[0].status === "READY" && !force) {
       const titleValues = titleUpdate(raced[0].title, title, replaceTitle);
+      const locationValues = locationUpdate(raced[0], location);
+      const updateValues = { ...titleValues, ...locationValues };
 
-      if (Object.keys(titleValues).length === 0) {
+      if (Object.keys(updateValues).length === 0) {
         return { photo: raced[0], alreadyReady: true };
       }
 
       const [updated] = await db
         .update(photos)
-        .set({ ...titleValues, updatedAt: new Date() })
+        .set({ ...updateValues, updatedAt: new Date() })
         .where(eq(photos.id, raced[0].id))
         .returning();
 
@@ -234,6 +268,7 @@ async function preparePhoto(
         status: "PROCESSING",
         failureMessage: null,
         ...titleUpdate(raced[0].title, title, replaceTitle),
+        ...locationUpdate(raced[0], location),
         updatedAt: new Date(),
       })
       .where(eq(photos.id, raced[0].id))
@@ -381,11 +416,13 @@ export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPh
   const albumSlug = normalizeAlbumSlug(options.albumSlug);
   const album = await ensureAlbum(albumSlug, options.albumTitle);
   const title = resolvedPhotoTitle(source.filePath, options.photoTitle);
+  const location = await resolvePhotoLocation(source);
   const prepared = await preparePhoto(
     source,
     options.force ?? false,
     title,
     options.photoTitle !== undefined,
+    location,
   );
 
   if (prepared.alreadyReady) {

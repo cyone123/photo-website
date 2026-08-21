@@ -36,6 +36,8 @@ export const photos = pgTable(
     iso: integer("iso"),
     latitude: numeric("latitude", { precision: 9, scale: 6 }),
     longitude: numeric("longitude", { precision: 9, scale: 6 }),
+    locationCity: text("location_city"),
+    locationDistrict: text("location_district"),
     rawExif: jsonb("raw_exif").$type<Record<string, unknown>>(),
     title: text("title"),
     description: text("description"),

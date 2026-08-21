@@ -15,6 +15,13 @@
       "when": 1787206233180,
       "tag": "0001_confused_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787328841979,
+      "tag": "0002_daily_toro",
+      "breakpoints": true
     }
   ]
 }

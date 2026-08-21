@@ -28,6 +28,8 @@ export interface InspectedPhoto {
   iso: number | null;
   latitude: number | null;
   longitude: number | null;
+  locationCity: string | null;
+  locationDistrict: string | null;
   space: string | null;
   hasAlpha: boolean;
 }
@@ -93,6 +95,68 @@ function asString(value: unknown) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
+function locationText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\s+/g, " ");
+    return normalized || null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = locationText(item);
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizedKey(value: string) {
+  return (
+    value
+      .split(":")
+      .at(-1)
+      ?.toLowerCase()
+      .replace(/[^a-z]/g, "") ?? ""
+  );
+}
+
+function findLocationValue(value: unknown, keys: Set<string>, depth = 0): string | null {
+  if (depth > 4 || !isRecord(value)) {
+    return null;
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (keys.has(normalizedKey(key))) {
+      const text = locationText(nestedValue);
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  for (const nestedValue of Object.values(value)) {
+    const text = findLocationValue(nestedValue, keys, depth + 1);
+
+    if (text) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
+function extractLocation(exif: ExifRecord) {
+  return {
+    city: findLocationValue(exif, new Set(["city"])),
+    district: findLocationValue(exif, new Set(["sublocation", "location", "district", "county"])),
+  };
+}
+
 function parseExifDate(value: unknown) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value;
@@ -147,7 +211,7 @@ function orientedDimensions(width: number, height: number, orientation: number |
 
 async function readExif(buffer: Buffer) {
   try {
-    const parsed = await exifr.parse(buffer);
+    const parsed = await exifr.parse(buffer, { iptc: true, xmp: true });
     return isRecord(parsed) ? parsed : {};
   } catch {
     // A valid image without readable EXIF should still be importable.
@@ -165,6 +229,7 @@ export async function inspectPhotoFile(filePath: string): Promise<InspectedPhoto
   }
 
   const exif = await readExif(buffer);
+  const location = extractLocation(exif);
   const orientation = asNumber(metadata.orientation);
   const dimensions = orientedDimensions(metadata.width, metadata.height, orientation);
   const format = metadata.format ?? null;
@@ -191,6 +256,8 @@ export async function inspectPhotoFile(filePath: string): Promise<InspectedPhoto
     iso: asNumber(exif.ISO),
     latitude: asNumber(exif.latitude ?? exif.GPSLatitude),
     longitude: asNumber(exif.longitude ?? exif.GPSLongitude),
+    locationCity: location.city,
+    locationDistrict: location.district,
     space: metadata.space ?? null,
     hasAlpha: metadata.hasAlpha ?? false,
   };
@@ -214,6 +281,8 @@ export function inspectionSummary(photo: InspectedPhoto) {
     iso: photo.iso,
     latitude: photo.latitude,
     longitude: photo.longitude,
+    locationCity: photo.locationCity,
+    locationDistrict: photo.locationDistrict,
   };
 }
 
