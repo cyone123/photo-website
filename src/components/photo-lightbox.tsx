@@ -11,6 +11,8 @@ type PhotoLightboxProps = {
   onActiveIndexChange: (index: number | null) => void;
 };
 
+type LightboxTransitionDirection = "initial" | "previous" | "next";
+
 function ArrowIcon({ direction }: { direction: "left" | "right" }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -30,6 +32,8 @@ function CloseIcon() {
 function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightboxProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const [transitionDirection, setTransitionDirection] =
+    useState<LightboxTransitionDirection>("initial");
   const photo = activeIndex === null ? null : photos[activeIndex];
   const canNavigate = photos.length > 1;
   const avifSourceSet = photo?.sources
@@ -42,6 +46,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
     .join(", ");
 
   const close = useCallback(() => {
+    setTransitionDirection("initial");
     onActiveIndexChange(null);
   }, [onActiveIndexChange]);
 
@@ -50,6 +55,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
       return;
     }
 
+    setTransitionDirection("previous");
     onActiveIndexChange((activeIndex - 1 + photos.length) % photos.length);
   }, [activeIndex, canNavigate, onActiveIndexChange, photos.length]);
 
@@ -58,6 +64,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
       return;
     }
 
+    setTransitionDirection("next");
     onActiveIndexChange((activeIndex + 1) % photos.length);
   }, [activeIndex, canNavigate, onActiveIndexChange, photos.length]);
 
@@ -114,7 +121,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
         .filter((source) => source.format === "webp")
         .map((source) => `${source.url} ${source.width}w`)
         .join(", ");
-      image.sizes = "100vw";
+      image.sizes = "(max-width: 640px) 100vw, calc(100vw - 168px)";
     }
   }, [activeIndex, photos]);
 
@@ -204,17 +211,28 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
             onPointerUp={handlePointerUp}
           >
             {photo.fallbackUrl ? (
-              <picture key={photo.id}>
+              <picture
+                key={photo.id}
+                className={`photo-lightbox-picture photo-lightbox-picture-${transitionDirection}`}
+              >
                 {avifSourceSet ? (
-                  <source type="image/avif" srcSet={avifSourceSet} sizes="100vw" />
+                  <source
+                    type="image/avif"
+                    srcSet={avifSourceSet}
+                    sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
+                  />
                 ) : null}
                 {webpSourceSet ? (
-                  <source type="image/webp" srcSet={webpSourceSet} sizes="100vw" />
+                  <source
+                    type="image/webp"
+                    srcSet={webpSourceSet}
+                    sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
+                  />
                 ) : null}
                 <img
                   src={photo.fallbackUrl}
                   srcSet={webpSourceSet}
-                  sizes="100vw"
+                  sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
                   alt={photo.title}
                   decoding="async"
                 />
