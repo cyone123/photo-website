@@ -7,12 +7,14 @@ import {
   isAcceptedUploadFile,
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_FILES,
+  ORIGINAL_UPLOAD_CACHE_CONTROL,
   type InitializedUpload,
   type UploadTaskView,
   uploadFileExtension,
   uploadMimeType,
   UPLOAD_URL_TTL_SECONDS,
 } from "@/lib/uploads";
+import { originalObjectKey } from "@/server/photos/object-key";
 import {
   createPresignedR2PutUrl,
   deleteR2Object,
@@ -51,10 +53,6 @@ function basename(value: string) {
 function normalizedExtension(filename: string) {
   const extension = uploadFileExtension(filename);
   return extension === "jpeg" ? "jpg" : extension;
-}
-
-function stagedUploadObjectKey(uploadId: string, reservedPhotoId: string, extension: string) {
-  return `uploads/${uploadId}/${reservedPhotoId}/original.${extension}`;
 }
 
 function normalizedUploadFile(input: z.infer<typeof uploadFileSchema>) {
@@ -158,7 +156,7 @@ export async function createUploadBatch(input: unknown): Promise<InitializedUplo
       id,
       reservedPhotoId,
       albumId: album.id,
-      objectKey: stagedUploadObjectKey(id, reservedPhotoId, file.extension),
+      objectKey: originalObjectKey(reservedPhotoId, file.extension),
       originalFilename: file.originalFilename,
       contentType: file.contentType,
       expectedByteSize: file.expectedByteSize,
@@ -174,6 +172,7 @@ export async function createUploadBatch(input: unknown): Promise<InitializedUplo
         bucket: privateBucket,
         key: task.objectKey,
         contentType: task.contentType,
+        cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
         expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
       }),
     ),
@@ -192,6 +191,7 @@ export async function createUploadBatch(input: unknown): Promise<InitializedUplo
     objectKey: task.objectKey,
     originalFilename: task.originalFilename,
     contentType: task.contentType,
+    cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
     expectedByteSize: task.expectedByteSize,
     presignedUrl: presignedUrls[index],
     expiresAt: expiresAt.toISOString(),
@@ -275,7 +275,7 @@ async function photoIdForFailedBuffer(buffer: Buffer) {
   return existing?.id ?? null;
 }
 
-async function processClaimedUpload(task: UploadRecord) {
+async function processClaimedUpload(task: UploadRecord, sourceEtag: string | null) {
   const { privateBucket } = getR2Buckets();
   let buffer: Buffer | undefined;
 
@@ -284,6 +284,7 @@ async function processClaimedUpload(task: UploadRecord) {
       bucket: privateBucket,
       key: task.objectKey,
       maxBytes: task.expectedByteSize,
+      ifMatch: sourceEtag ?? undefined,
     });
     const { processPhotoSource } = await import("@/server/photos/process-photo");
     const result = await processPhotoSource({
@@ -293,6 +294,10 @@ async function processClaimedUpload(task: UploadRecord) {
       sourceLabel: `R2 upload ${task.id}`,
       reservedPhotoId: task.reservedPhotoId,
       albumId: task.albumId,
+      storedOriginal: {
+        objectKey: task.objectKey,
+        etag: sourceEtag ?? undefined,
+      },
     });
     const photo = await getDb().query.photos.findFirst({
       columns: { id: true, originalKey: true },
@@ -303,7 +308,11 @@ async function processClaimedUpload(task: UploadRecord) {
       throw new Error("照片处理完成，但数据库记录不存在。");
     }
 
-    if (result.status === "skipped" || photo.originalKey !== task.objectKey) {
+    // A retry can legitimately skip a READY photo created by this same task.
+    // Ownership, rather than the processing status, decides deduplication and cleanup.
+    const deduplicated = photo.id !== task.reservedPhotoId;
+
+    if (photo.originalKey !== task.objectKey) {
       await deleteR2Object({ bucket: privateBucket, key: task.objectKey });
     }
 
@@ -313,7 +322,7 @@ async function processClaimedUpload(task: UploadRecord) {
       .set({
         status: "SUCCEEDED",
         photoId: photo.id,
-        deduplicated: result.status === "skipped",
+        deduplicated,
         failureMessage: null,
         completedAt: now,
         updatedAt: now,
@@ -323,7 +332,7 @@ async function processClaimedUpload(task: UploadRecord) {
       uploadId: task.id,
       albumId: task.albumId,
       photoId: photo.id,
-      deduplicated: result.status === "skipped",
+      deduplicated,
       variantCount: result.variantCount,
     });
     return getAdminUploadTask(task.id);
@@ -360,9 +369,7 @@ export async function completeUploadTask(idInput: string) {
     throw new UploadServiceError("该上传任务正在处理。", 409);
   }
 
-  try {
-    await verifyUploadedObject(task);
-  } catch (error) {
+  const object = await verifyUploadedObject(task).catch(async (error: unknown) => {
     await getDb()
       .update(photoUploads)
       .set({ status: "FAILED", failureMessage: publicFailureMessage(error), updatedAt: new Date() })
@@ -370,9 +377,9 @@ export async function completeUploadTask(idInput: string) {
         and(eq(photoUploads.id, task.id), inArray(photoUploads.status, ["PENDING", "FAILED"])),
       );
     throw error;
-  }
+  });
 
-  return processClaimedUpload(await claimUpload(task));
+  return processClaimedUpload(await claimUpload(task), object.etag);
 }
 
 async function renewUpload(task: UploadRecord) {
@@ -382,6 +389,7 @@ async function renewUpload(task: UploadRecord) {
     bucket: privateBucket,
     key: task.objectKey,
     contentType: task.contentType,
+    cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
     expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
   });
   await getDb()
@@ -402,6 +410,7 @@ async function renewUpload(task: UploadRecord) {
       objectKey: task.objectKey,
       originalFilename: task.originalFilename,
       contentType: task.contentType,
+      cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
       expectedByteSize: task.expectedByteSize,
       presignedUrl,
       expiresAt: expiresAt.toISOString(),

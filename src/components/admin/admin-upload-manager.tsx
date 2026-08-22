@@ -62,6 +62,7 @@ function uploadToR2(file: File, upload: InitializedUpload, onProgress: (progress
     const request = new XMLHttpRequest();
     request.open("PUT", upload.presignedUrl);
     request.setRequestHeader("Content-Type", upload.contentType);
+    request.setRequestHeader("Cache-Control", upload.cacheControl);
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
         onProgress(Math.round((event.loaded / event.total) * 100));

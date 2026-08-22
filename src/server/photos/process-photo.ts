@@ -3,7 +3,8 @@ import path from "node:path";
 import { and, eq, isNull, max } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { albumPhotos, albums, photoVariants, photos } from "@/db/schema";
-import { getR2Buckets, putR2Object } from "@/storage/r2";
+import { ORIGINAL_UPLOAD_CACHE_CONTROL } from "@/lib/uploads";
+import { copyR2Object, getR2Buckets, putR2Object } from "@/storage/r2";
 import { inspectPhotoBuffer, type InspectedPhotoBuffer } from "./inspect-photo";
 import { originalObjectKey, publicVariantObjectKey } from "./object-key";
 import { resolvePhotoLocation, type PhotoLocation } from "./photo-location";
@@ -22,6 +23,12 @@ export interface ProcessPhotoSourceInput {
   replaceTitle?: boolean;
   force?: boolean;
   sourceLabel?: string;
+  storedOriginal?: StoredOriginalSource;
+}
+
+export interface StoredOriginalSource {
+  objectKey: string;
+  etag?: string;
 }
 
 export interface ProcessPhotoSourceResult {
@@ -37,6 +44,7 @@ export interface ProcessInspectedPhotoInput {
   title?: string | null;
   replaceTitle?: boolean;
   force?: boolean;
+  storedOriginal?: StoredOriginalSource;
 }
 
 export interface PreparePhotoRecordInput {
@@ -215,7 +223,32 @@ async function uploadOriginal(photo: PhotoRecord, source: InspectedPhotoBuffer) 
     key: photo.originalKey,
     body: source.buffer,
     contentType: source.mimeType,
-    cacheControl: "private, no-store",
+    cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
+  });
+}
+
+async function persistOriginal(
+  photo: PhotoRecord,
+  source: InspectedPhotoBuffer,
+  storedOriginal?: StoredOriginalSource,
+) {
+  if (!storedOriginal) {
+    await uploadOriginal(photo, source);
+    return;
+  }
+
+  if (storedOriginal.objectKey === photo.originalKey) {
+    return;
+  }
+
+  const { privateBucket } = getR2Buckets();
+  await copyR2Object({
+    bucket: privateBucket,
+    sourceKey: storedOriginal.objectKey,
+    destinationKey: photo.originalKey,
+    sourceEtag: storedOriginal.etag,
+    contentType: source.mimeType,
+    cacheControl: ORIGINAL_UPLOAD_CACHE_CONTROL,
   });
 }
 
@@ -260,13 +293,17 @@ async function saveVariants(photoId: string, variants: GeneratedVariants) {
   }
 }
 
-export async function generateAndUploadVariants(photo: PhotoRecord, source: InspectedPhotoBuffer) {
+export async function generateAndUploadVariants(
+  photo: PhotoRecord,
+  source: InspectedPhotoBuffer,
+  storedOriginal?: StoredOriginalSource,
+) {
   const [variants, blurhash] = await Promise.all([
     generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
     generatePhotoBlurhash(source.buffer),
   ]);
 
-  await uploadOriginal(photo, source);
+  await persistOriginal(photo, source, storedOriginal);
   await uploadPublicVariants(photo.id, variants);
   await saveVariants(photo.id, variants);
 
@@ -349,6 +386,7 @@ export async function processPhotoSource(
     title: input.title,
     replaceTitle: input.replaceTitle,
     force: input.force,
+    storedOriginal: input.storedOriginal,
   });
 }
 
@@ -380,7 +418,11 @@ export async function processInspectedPhotoSource(
   }
 
   try {
-    const generated = await generateAndUploadVariants(prepared.photo, inspection);
+    const generated = await generateAndUploadVariants(
+      prepared.photo,
+      inspection,
+      input.storedOriginal,
+    );
     await markPhotoReady(prepared.photo.id, generated.blurhash);
 
     if (input.albumId) {

@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
@@ -70,19 +71,48 @@ export async function createPresignedR2PutUrl(input: {
   bucket: string;
   key: string;
   contentType: string;
+  cacheControl?: string;
   expiresInSeconds: number;
 }) {
+  const signableHeaders = new Set(["content-type"]);
+
+  if (input.cacheControl) {
+    signableHeaders.add("cache-control");
+  }
+
   return getSignedUrl(
     getR2Client(),
     new PutObjectCommand({
       Bucket: input.bucket,
       Key: input.key,
       ContentType: input.contentType,
+      CacheControl: input.cacheControl,
     }),
     {
       expiresIn: input.expiresInSeconds,
-      signableHeaders: new Set(["content-type"]),
+      signableHeaders,
     },
+  );
+}
+
+export async function copyR2Object(input: {
+  bucket: string;
+  sourceKey: string;
+  destinationKey: string;
+  contentType: string;
+  cacheControl?: string;
+  sourceEtag?: string;
+}) {
+  await getR2Client().send(
+    new CopyObjectCommand({
+      Bucket: input.bucket,
+      Key: input.destinationKey,
+      CopySource: `${input.bucket}/${input.sourceKey}`,
+      CopySourceIfMatch: input.sourceEtag,
+      MetadataDirective: "REPLACE",
+      ContentType: input.contentType,
+      CacheControl: input.cacheControl,
+    }),
   );
 }
 
@@ -123,9 +153,14 @@ export async function headR2Object(input: { bucket: string; key: string }) {
   }
 }
 
-export async function getR2ObjectBuffer(input: { bucket: string; key: string; maxBytes?: number }) {
+export async function getR2ObjectBuffer(input: {
+  bucket: string;
+  key: string;
+  maxBytes?: number;
+  ifMatch?: string;
+}) {
   const result = await getR2Client().send(
-    new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+    new GetObjectCommand({ Bucket: input.bucket, Key: input.key, IfMatch: input.ifMatch }),
   );
 
   if (!result.Body) {
