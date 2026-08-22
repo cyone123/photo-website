@@ -1,16 +1,12 @@
-import { createHash, randomUUID } from "node:crypto";
-import path from "node:path";
-import { and, eq, isNull, max } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { readImportEnv } from "@/config/env";
 import { getDb } from "@/db/client";
-import { albumPhotos, albums, photoVariants, photos } from "@/db/schema";
-import { originalObjectKey, publicVariantObjectKey } from "@/importer/object-key";
-import { inspectPhotoFile, type InspectedPhoto } from "@/importer/inspect-image";
-import { reverseGeocodePhotoLocation, type PhotoLocation } from "@/importer/reverse-geocode";
-import { generatePhotoBlurhash, generatePublicVariants } from "@/importer/variants";
-import { getR2Buckets, putR2Object } from "@/storage/r2";
+import { albums } from "@/db/schema";
+import { inspectPhotoFile } from "@/importer/inspect-image";
+import { generatePhotoBlurhash, generatePublicVariants } from "@/server/photos/variants";
+import { processInspectedPhotoSource } from "@/server/photos/process-photo";
 
-type PhotoRecord = typeof photos.$inferSelect;
 type AlbumRecord = typeof albums.$inferSelect;
 
 export interface ImportPhotoOptions {
@@ -81,8 +77,8 @@ async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
   };
 
   try {
-    const inserted = await db.insert(albums).values(albumValues).returning();
-    return inserted[0];
+    const [inserted] = await db.insert(albums).values(albumValues).returning();
+    return inserted;
   } catch (error) {
     if (!isUniqueViolation(error)) {
       throw error;
@@ -95,298 +91,6 @@ async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
     }
 
     return raced[0];
-  }
-}
-
-function photoTitleFromFilePath(filePath: string) {
-  const title = path.parse(filePath).name.trim();
-  return title || null;
-}
-
-function resolvedPhotoTitle(filePath: string, requestedTitle?: string) {
-  if (requestedTitle !== undefined) {
-    const title = requestedTitle.trim();
-
-    if (!title) {
-      throw new Error("Photo title cannot be empty.");
-    }
-
-    return title;
-  }
-
-  return photoTitleFromFilePath(filePath);
-}
-
-function titleUpdate(
-  currentTitle: string | null,
-  nextTitle: string | null,
-  replaceExisting: boolean,
-) {
-  return nextTitle && (replaceExisting || !currentTitle) ? { title: nextTitle } : {};
-}
-
-function locationUpdate(current: PhotoRecord, next: PhotoLocation) {
-  return {
-    ...(next.city && !current.locationCity ? { locationCity: next.city } : {}),
-    ...(next.district && !current.locationDistrict ? { locationDistrict: next.district } : {}),
-  };
-}
-
-async function resolvePhotoLocation(photo: InspectedPhoto): Promise<PhotoLocation> {
-  const embedded = {
-    city: photo.locationCity,
-    district: photo.locationDistrict,
-  };
-
-  if (embedded.city && embedded.district) {
-    return embedded;
-  }
-
-  const geocoded = await reverseGeocodePhotoLocation(photo.latitude, photo.longitude);
-
-  return {
-    city: embedded.city ?? geocoded.city,
-    district: embedded.district ?? geocoded.district,
-  };
-}
-
-async function preparePhoto(
-  photo: InspectedPhoto,
-  force: boolean,
-  title: string | null,
-  replaceTitle: boolean,
-  location: PhotoLocation,
-) {
-  const db = getDb();
-  const contentHash = sha256(photo.buffer);
-  const existing = await db
-    .select()
-    .from(photos)
-    .where(eq(photos.contentHash, contentHash))
-    .limit(1);
-
-  if (existing[0]) {
-    if (existing[0].status === "READY" && !force) {
-      const titleValues = titleUpdate(existing[0].title, title, replaceTitle);
-      const locationValues = locationUpdate(existing[0], location);
-      const updateValues = { ...titleValues, ...locationValues };
-
-      if (Object.keys(updateValues).length === 0) {
-        return { photo: existing[0], alreadyReady: true };
-      }
-
-      const [updated] = await db
-        .update(photos)
-        .set({ ...updateValues, updatedAt: new Date() })
-        .where(eq(photos.id, existing[0].id))
-        .returning();
-
-      return { photo: updated, alreadyReady: true };
-    }
-
-    const [updated] = await db
-      .update(photos)
-      .set({
-        status: "PROCESSING",
-        failureMessage: null,
-        ...titleUpdate(existing[0].title, title, replaceTitle),
-        ...locationUpdate(existing[0], location),
-        updatedAt: new Date(),
-      })
-      .where(eq(photos.id, existing[0].id))
-      .returning();
-
-    return { photo: updated, alreadyReady: false };
-  }
-
-  const id = randomUUID();
-  const values = {
-    id,
-    contentHash,
-    status: "PROCESSING" as const,
-    originalKey: originalObjectKey(id, photo.sourceExtension),
-    width: photo.width,
-    height: photo.height,
-    takenAt: photo.takenAt,
-    takenAtOffsetMinutes: photo.takenAtOffsetMinutes,
-    cameraMake: photo.cameraMake,
-    cameraModel: photo.cameraModel,
-    lensModel: photo.lensModel,
-    focalLengthMm: photo.focalLengthMm?.toString() ?? null,
-    aperture: photo.aperture?.toString() ?? null,
-    exposureTimeSeconds: photo.exposureTimeSeconds?.toString() ?? null,
-    iso: photo.iso,
-    latitude: photo.latitude?.toString() ?? null,
-    longitude: photo.longitude?.toString() ?? null,
-    locationCity: location.city,
-    locationDistrict: location.district,
-    rawExif: photo.rawExif,
-    title,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  try {
-    const inserted = await db.insert(photos).values(values).returning();
-    return { photo: inserted[0], alreadyReady: false };
-  } catch (error) {
-    if (!isUniqueViolation(error)) {
-      throw error;
-    }
-
-    const raced = await db
-      .select()
-      .from(photos)
-      .where(eq(photos.contentHash, contentHash))
-      .limit(1);
-
-    if (!raced[0]) {
-      throw error;
-    }
-
-    if (raced[0].status === "READY" && !force) {
-      const titleValues = titleUpdate(raced[0].title, title, replaceTitle);
-      const locationValues = locationUpdate(raced[0], location);
-      const updateValues = { ...titleValues, ...locationValues };
-
-      if (Object.keys(updateValues).length === 0) {
-        return { photo: raced[0], alreadyReady: true };
-      }
-
-      const [updated] = await db
-        .update(photos)
-        .set({ ...updateValues, updatedAt: new Date() })
-        .where(eq(photos.id, raced[0].id))
-        .returning();
-
-      return { photo: updated, alreadyReady: true };
-    }
-
-    const [updated] = await db
-      .update(photos)
-      .set({
-        status: "PROCESSING",
-        failureMessage: null,
-        ...titleUpdate(raced[0].title, title, replaceTitle),
-        ...locationUpdate(raced[0], location),
-        updatedAt: new Date(),
-      })
-      .where(eq(photos.id, raced[0].id))
-      .returning();
-
-    return { photo: updated, alreadyReady: false };
-  }
-}
-
-function sha256(buffer: Buffer) {
-  return createHash("sha256").update(buffer).digest("hex");
-}
-
-async function uploadAssets(
-  photo: PhotoRecord,
-  source: InspectedPhoto,
-  variants: Awaited<ReturnType<typeof generatePublicVariants>>,
-) {
-  const buckets = getR2Buckets();
-
-  await putR2Object({
-    bucket: buckets.privateBucket,
-    key: photo.originalKey,
-    body: source.buffer,
-    contentType: source.mimeType,
-    cacheControl: "private, no-store",
-  });
-
-  for (const variant of variants) {
-    await putR2Object({
-      bucket: buckets.publicBucket,
-      key: publicVariantObjectKey(photo.id, variant.targetWidth, variant.format),
-      body: variant.buffer,
-      contentType: variant.mimeType,
-      cacheControl: "public, max-age=31536000, immutable",
-    });
-  }
-}
-
-async function saveVariants(
-  photoId: string,
-  variants: Awaited<ReturnType<typeof generatePublicVariants>>,
-) {
-  const db = getDb();
-
-  for (const variant of variants) {
-    await db
-      .insert(photoVariants)
-      .values({
-        photoId,
-        width: variant.width,
-        height: variant.height,
-        format: variant.format,
-        mimeType: variant.mimeType,
-        objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
-        byteSize: variant.byteSize,
-      })
-      .onConflictDoUpdate({
-        target: [photoVariants.photoId, photoVariants.width, photoVariants.format],
-        set: {
-          height: variant.height,
-          mimeType: variant.mimeType,
-          objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
-          byteSize: variant.byteSize,
-        },
-      });
-  }
-}
-
-async function markPhotoReady(photoId: string, blurhash: string) {
-  await getDb()
-    .update(photos)
-    .set({ status: "READY", blurhash, failureMessage: null, updatedAt: new Date() })
-    .where(eq(photos.id, photoId));
-}
-
-async function markPhotoFailed(photoId: string, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-
-  try {
-    await getDb()
-      .update(photos)
-      .set({ status: "FAILED", failureMessage: message.slice(0, 1000), updatedAt: new Date() })
-      .where(eq(photos.id, photoId));
-  } catch {
-    // Preserve the original import error when the database is unavailable too.
-  }
-}
-
-async function linkPhotoToAlbum(album: AlbumRecord, photoId: string) {
-  const db = getDb();
-  const existing = await db
-    .select()
-    .from(albumPhotos)
-    .where(and(eq(albumPhotos.albumId, album.id), eq(albumPhotos.photoId, photoId)))
-    .limit(1);
-
-  if (existing[0]) {
-    return;
-  }
-
-  const lastPosition = await db
-    .select({ value: max(albumPhotos.sortOrder) })
-    .from(albumPhotos)
-    .where(eq(albumPhotos.albumId, album.id));
-  const sortOrder = Number(lastPosition[0]?.value ?? -1) + 1;
-
-  await db.insert(albumPhotos).values({
-    albumId: album.id,
-    photoId,
-    sortOrder,
-  });
-
-  if (album.coverPhotoId === null) {
-    await db
-      .update(albums)
-      .set({ coverPhotoId: photoId, updatedAt: new Date() })
-      .where(and(eq(albums.id, album.id), isNull(albums.coverPhotoId)));
   }
 }
 
@@ -406,58 +110,27 @@ export async function dryRunPhotoImport(options: ImportPhotoOptions): Promise<Im
 }
 
 export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPhotoResult> {
-  const source = await inspectPhotoFile(options.filePath);
-
   if (options.dryRun) {
     return dryRunPhotoImport(options);
   }
 
+  const source = await inspectPhotoFile(options.filePath);
   readImportEnv();
   const albumSlug = normalizeAlbumSlug(options.albumSlug);
   const album = await ensureAlbum(albumSlug, options.albumTitle);
-  const title = resolvedPhotoTitle(source.filePath, options.photoTitle);
-  const location = await resolvePhotoLocation(source);
-  const prepared = await preparePhoto(
-    source,
-    options.force ?? false,
-    title,
-    options.photoTitle !== undefined,
-    location,
-  );
-
-  if (prepared.alreadyReady) {
-    await linkPhotoToAlbum(album, prepared.photo.id);
-
-    return {
-      status: "skipped",
-      filePath: source.filePath,
-      photoId: prepared.photo.id,
-      variantCount: 0,
-      albumSlug,
-    };
-  }
-
-  const [variants, blurhash] = await Promise.all([
-    generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
-    generatePhotoBlurhash(source.buffer),
-  ]);
-
-  try {
-    await uploadAssets(prepared.photo, source, variants);
-    await saveVariants(prepared.photo.id, variants);
-    await markPhotoReady(prepared.photo.id, blurhash);
-  } catch (error) {
-    await markPhotoFailed(prepared.photo.id, error);
-    throw error;
-  }
-
-  await linkPhotoToAlbum(album, prepared.photo.id);
+  const result = await processInspectedPhotoSource({
+    inspection: source,
+    albumId: album.id,
+    title: options.photoTitle,
+    replaceTitle: options.photoTitle !== undefined,
+    force: options.force,
+  });
 
   return {
-    status: "imported",
+    status: result.status === "processed" ? "imported" : "skipped",
     filePath: source.filePath,
-    photoId: prepared.photo.id,
-    variantCount: variants.length,
+    photoId: result.photoId,
+    variantCount: result.variantCount,
     albumSlug,
   };
 }

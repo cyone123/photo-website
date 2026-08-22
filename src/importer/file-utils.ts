@@ -1,46 +1,13 @@
 import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import { SUPPORTED_IMAGE_EXTENSIONS } from "./constants";
+import { fileExtension } from "@/server/photos/source-format";
 
-const MIME_TYPES: Record<string, string> = {
-  avif: "image/avif",
-  heic: "image/heic",
-  heif: "image/heif",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  webp: "image/webp",
-};
-
-export function fileExtension(filePath: string) {
-  return path.extname(filePath).slice(1).toLowerCase();
-}
-
-export function storageExtension(filePath: string, format?: string | null) {
-  const extension = fileExtension(filePath);
-
-  if (extension === "jpeg") {
-    return "jpg";
-  }
-
-  if (extension) {
-    return extension;
-  }
-
-  if (format === "jpeg") {
-    return "jpg";
-  }
-
-  return format ?? "bin";
-}
-
-export function mimeTypeForExtension(extension: string, format?: string | null) {
-  return (
-    MIME_TYPES[extension.toLowerCase()] ?? (format ? `image/${format}` : "application/octet-stream")
-  );
-}
+export {
+  fileExtension,
+  mimeTypeForExtension,
+  storageExtension,
+} from "@/server/photos/source-format";
 
 export function isSupportedImageFile(filePath: string) {
   return SUPPORTED_IMAGE_EXTENSIONS.has(fileExtension(filePath));
