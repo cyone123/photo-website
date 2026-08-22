@@ -100,6 +100,13 @@ export const verification = pgTable(
 
 export const photoStatusEnum = pgEnum("photo_status", ["PROCESSING", "READY", "FAILED"]);
 export const albumStatusEnum = pgEnum("album_status", ["DRAFT", "PUBLISHED"]);
+export const photoUploadStatusEnum = pgEnum("photo_upload_status", [
+  "PENDING",
+  "UPLOADED",
+  "PROCESSING",
+  "SUCCEEDED",
+  "FAILED",
+]);
 
 export const photos = pgTable(
   "photos",
@@ -197,9 +204,40 @@ export const albumPhotos = pgTable(
   ],
 );
 
+export const photoUploads = pgTable(
+  "photo_uploads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reservedPhotoId: uuid("reserved_photo_id").notNull(),
+    albumId: uuid("album_id")
+      .notNull()
+      .references(() => albums.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    expectedByteSize: integer("expected_byte_size").notNull(),
+    status: photoUploadStatusEnum("status").default("PENDING").notNull(),
+    photoId: uuid("photo_id").references(() => photos.id, { onDelete: "set null" }),
+    deduplicated: boolean("deduplicated").default(false).notNull(),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    failureMessage: text("failure_message"),
+    uploadExpiresAt: timestamp("upload_expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("photo_uploads_object_key_unique").on(table.objectKey),
+    index("photo_uploads_album_id_idx").on(table.albumId),
+    index("photo_uploads_status_idx").on(table.status),
+    index("photo_uploads_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export const photosRelations = relations(photos, ({ many }) => ({
   variants: many(photoVariants),
   albumPhotos: many(albumPhotos),
+  uploads: many(photoUploads),
 }));
 
 export const photoVariantsRelations = relations(photoVariants, ({ one }) => ({
@@ -215,6 +253,7 @@ export const albumsRelations = relations(albums, ({ one, many }) => ({
     references: [photos.id],
   }),
   albumPhotos: many(albumPhotos),
+  uploads: many(photoUploads),
 }));
 
 export const albumPhotosRelations = relations(albumPhotos, ({ one }) => ({
@@ -224,6 +263,17 @@ export const albumPhotosRelations = relations(albumPhotos, ({ one }) => ({
   }),
   photo: one(photos, {
     fields: [albumPhotos.photoId],
+    references: [photos.id],
+  }),
+}));
+
+export const photoUploadsRelations = relations(photoUploads, ({ one }) => ({
+  album: one(albums, {
+    fields: [photoUploads.albumId],
+    references: [albums.id],
+  }),
+  photo: one(photos, {
+    fields: [photoUploads.photoId],
     references: [photos.id],
   }),
 }));

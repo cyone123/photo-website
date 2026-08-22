@@ -1,4 +1,11 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { readServerEnv } from "@/config/env";
 
 function createR2Client() {
@@ -57,4 +64,91 @@ export async function putR2Object(input: {
       CacheControl: input.cacheControl,
     }),
   );
+}
+
+export async function createPresignedR2PutUrl(input: {
+  bucket: string;
+  key: string;
+  contentType: string;
+  expiresInSeconds: number;
+}) {
+  return getSignedUrl(
+    getR2Client(),
+    new PutObjectCommand({
+      Bucket: input.bucket,
+      Key: input.key,
+      ContentType: input.contentType,
+    }),
+    {
+      expiresIn: input.expiresInSeconds,
+      signableHeaders: new Set(["content-type"]),
+    },
+  );
+}
+
+function isR2NotFound(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const candidate = error as {
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    candidate.$metadata?.httpStatusCode === 404 ||
+    candidate.name === "NotFound" ||
+    candidate.name === "NoSuchKey"
+  );
+}
+
+export async function headR2Object(input: { bucket: string; key: string }) {
+  try {
+    const result = await getR2Client().send(
+      new HeadObjectCommand({ Bucket: input.bucket, Key: input.key }),
+    );
+
+    return {
+      byteSize: result.ContentLength ?? null,
+      contentType: result.ContentType ?? null,
+      etag: result.ETag ?? null,
+      lastModified: result.LastModified ?? null,
+    };
+  } catch (error) {
+    if (isR2NotFound(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function getR2ObjectBuffer(input: { bucket: string; key: string; maxBytes?: number }) {
+  const result = await getR2Client().send(
+    new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+  );
+
+  if (!result.Body) {
+    throw new Error(`R2 object has no body: ${input.key}`);
+  }
+
+  if (
+    input.maxBytes !== undefined &&
+    result.ContentLength !== undefined &&
+    result.ContentLength > input.maxBytes
+  ) {
+    throw new Error(`R2 object exceeds the allowed size: ${input.key}`);
+  }
+
+  const bytes = await result.Body.transformToByteArray();
+
+  if (input.maxBytes !== undefined && bytes.byteLength > input.maxBytes) {
+    throw new Error(`R2 object exceeds the allowed size: ${input.key}`);
+  }
+
+  return Buffer.from(bytes);
+}
+
+export async function deleteR2Object(input: { bucket: string; key: string }) {
+  await getR2Client().send(new DeleteObjectCommand({ Bucket: input.bucket, Key: input.key }));
 }

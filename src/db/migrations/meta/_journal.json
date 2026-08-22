@@ -29,6 +29,13 @@
       "when": 1787390567935,
       "tag": "0003_secret_stark_industries",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787392937138,
+      "tag": "0004_violet_junta",
+      "breakpoints": true
     }
   ]
 }

@@ -73,6 +73,14 @@ pnpm photo update <photo-id> --title "雪场日落"
 pnpm photo update <photo-id> --title "雪场日落" --description "将军山，日落前。"
 ```
 
+### 管理员初始化（`pnpm admin:init`）
+
+```bash
+pnpm admin:init [--email <邮箱>]    # 邮箱缺省取 ADMIN_EMAIL；密码交互输入（≥12 位）
+```
+
+仅在 `user` 表为空时可运行（首个管理员）；需要交互式 TTY，且 `BETTER_AUTH_SECRET` ≥32 字符。better-auth 配置了 `disableSignUp: true`，这是唯一建号入口。
+
 ## 相册叙事与封面焦点
 
 ```bash

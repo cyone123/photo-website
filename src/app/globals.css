@@ -1729,7 +1729,8 @@ h3 {
 }
 
 .admin-field input,
-.admin-field textarea {
+.admin-field textarea,
+.admin-field select {
   width: 100%;
   border: 1px solid var(--hairline);
   border-radius: 0;
@@ -1745,7 +1746,8 @@ h3 {
 }
 
 .admin-field input:focus,
-.admin-field textarea:focus {
+.admin-field textarea:focus,
+.admin-field select:focus {
   border-color: var(--on-dark);
   outline: 0;
 }
@@ -2099,6 +2101,251 @@ h3 {
   font-size: 14px;
 }
 
+.admin-upload-manager {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-upload-limit {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-upload-album-field {
+  max-width: 520px;
+  margin-bottom: 22px;
+}
+
+.admin-upload-dropzone {
+  position: relative;
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  border: 1px dashed var(--hairline);
+  background: #080808;
+  padding: 32px;
+  text-align: center;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.admin-upload-dropzone-active {
+  border-color: var(--m-blue-dark);
+  background: rgba(28, 105, 212, 0.09);
+}
+
+.admin-upload-dropzone > input,
+.admin-upload-task-actions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.admin-upload-dropzone > strong {
+  color: var(--on-dark);
+  font-size: 22px;
+}
+
+.admin-upload-dropzone > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-upload-dropzone .admin-button {
+  margin-top: 8px;
+}
+
+.admin-upload-queue {
+  display: grid;
+  gap: 1px;
+  margin-top: 24px;
+  background: var(--hairline-strong);
+}
+
+.admin-upload-overall {
+  position: relative;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  background: #111;
+  padding: 12px 16px;
+  color: var(--body-strong);
+  font-size: 12px;
+}
+
+.admin-upload-overall i {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--m-blue-dark);
+  transition: width 180ms ease;
+}
+
+.admin-upload-queue-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(100px, 220px) 130px auto;
+  gap: 16px;
+  align-items: center;
+  background: #0b0b0b;
+  padding: 14px 16px;
+}
+
+.admin-upload-queue-item > div:first-child {
+  min-width: 0;
+}
+
+.admin-upload-queue-item strong,
+.admin-upload-queue-item span {
+  display: block;
+}
+
+.admin-upload-queue-item strong {
+  overflow: hidden;
+  color: var(--body-strong);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-upload-queue-item > div:first-child span,
+.admin-upload-queue-item > p {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.admin-upload-queue-item > p {
+  grid-column: 1 / -1;
+}
+
+.admin-upload-item-progress {
+  height: 4px;
+  overflow: hidden;
+  background: #242424;
+}
+
+.admin-upload-item-progress i {
+  display: block;
+  height: 100%;
+  background: var(--m-blue-dark);
+  transition: width 180ms ease;
+}
+
+.admin-upload-local-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-upload-local-status-succeeded {
+  color: #8bd8aa;
+}
+
+.admin-upload-local-status-failed {
+  color: #ff9ca6;
+}
+
+.admin-upload-queue-item > button,
+.admin-upload-task-actions button,
+.admin-upload-task-actions label {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--body-strong);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.admin-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.admin-upload-task-list {
+  display: grid;
+  gap: 1px;
+  background: var(--hairline-strong);
+}
+
+.admin-upload-task {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 110px 100px minmax(180px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  background: #0a0a0a;
+  padding: 16px;
+}
+
+.admin-upload-task-file {
+  min-width: 0;
+}
+
+.admin-upload-task-file strong,
+.admin-upload-task-file span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-upload-task-file strong {
+  color: var(--body-strong);
+  font-size: 13px;
+}
+
+.admin-upload-task-file span,
+.admin-upload-task-time,
+.admin-upload-task-result {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.admin-upload-status {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--hairline);
+  padding: 4px 7px;
+  color: var(--body-strong);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.admin-upload-status-processing,
+.admin-upload-status-uploaded {
+  border-color: #846b2e;
+  color: #e8cc83;
+}
+
+.admin-upload-status-succeeded {
+  border-color: #286f46;
+  color: #8bd8aa;
+}
+
+.admin-upload-status-failed {
+  border-color: #8a2630;
+  color: #ff9ca6;
+}
+
+.admin-upload-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 @media (max-width: 1100px) {
   .admin-stat-grid,
   .admin-photo-grid {
@@ -2111,6 +2358,14 @@ h3 {
 
   .admin-editor-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-upload-task {
+    grid-template-columns: minmax(220px, 1fr) 100px minmax(180px, 1fr) auto;
+  }
+
+  .admin-upload-task-time {
+    display: none;
   }
 }
 
@@ -2177,6 +2432,16 @@ h3 {
   .admin-preview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .admin-upload-queue-item,
+  .admin-upload-task {
+    grid-template-columns: 1fr auto;
+  }
+
+  .admin-upload-item-progress,
+  .admin-upload-task-result {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 560px) {
@@ -2196,5 +2461,20 @@ h3 {
   .admin-panel,
   .admin-login-panel {
     padding: 22px;
+  }
+
+  .admin-upload-dropzone {
+    min-height: 220px;
+    padding: 24px 16px;
+  }
+
+  .admin-upload-queue-item,
+  .admin-upload-task {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-upload-item-progress,
+  .admin-upload-task-result {
+    grid-column: auto;
   }
 }

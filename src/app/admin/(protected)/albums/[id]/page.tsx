@@ -103,7 +103,10 @@ export default async function EditAdminAlbumPage({ params }: { params: Promise<{
             <span className="label">Photos / {String(album.photos.length).padStart(2, "0")}</span>
             <h2>相册照片</h2>
           </div>
-          <Link className="admin-button admin-button-secondary" href="/admin/uploads">
+          <Link
+            className="admin-button admin-button-secondary"
+            href={`/admin/uploads?albumId=${album.id}`}
+          >
             上传照片
           </Link>
         </div>
@@ -139,7 +142,7 @@ export default async function EditAdminAlbumPage({ params }: { params: Promise<{
         ) : (
           <div className="admin-inline-empty">
             <p>这个相册还没有照片。</p>
-            <span>阶段 4 完成后可以在后台直接上传；目前仍可使用 `pnpm photo import`。</span>
+            <span>可以从后台直传原图，也可以继续使用 `pnpm photo import`。</span>
           </div>
         )}
       </section>
