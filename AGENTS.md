@@ -55,7 +55,7 @@ pnpm db:push        # 直接推送 schema（跳过迁移文件）
 
 1. 校验并解析 EXIF（文件路径走 `inspectPhotoFile` 包装，Buffer 走 `inspectPhotoBuffer`）；
 2. 计算原文件 SHA-256，已存在且 READY（且非 force）则跳过，只补标题或位置；
-3. sharp 生成方向校正后的 480/960/1600/2400px AVIF（quality 62）+ WebP（quality 82）变体（`variant-config.ts` 定义尺寸），并计算 BlurHash；
+3. sharp 生成方向校正后的 480/960/1600/2400px AVIF（quality 62）变体（`variant-config.ts` 定义尺寸），并计算 BlurHash；
 4. 原图写入私有 R2 Bucket（`no-store`），变体写入公开 Bucket（`immutable` 一年缓存）；有 GPS 时调 Nominatim 反解城市/区县（限速 1.1s/次 + 进程内缓存，见 `photo-location.ts`）；
 5. 写库标记 `READY`；失败标 `FAILED` 并记录 `failureMessage`，重跑可续传。
 

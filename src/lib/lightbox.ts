@@ -23,12 +23,11 @@ export function toLightboxPhoto(photo: GalleryPhoto): LightboxPhoto {
   const sources = photo.variants
     .filter(
       (variant): variant is typeof variant & { url: string } =>
-        (variant.format === "avif" || variant.format === "webp") && Boolean(variant.url),
+        variant.format === "avif" && Boolean(variant.url),
     )
     .sort((left, right) => left.width - right.width)
-    .map((variant) => ({ width: variant.width, url: variant.url, format: variant.format }));
-  const webpSources = sources.filter((source) => source.format === "webp");
-  const fallback = webpSources.find((source) => source.width >= 1600) ?? webpSources.at(-1) ?? null;
+    .map((variant) => ({ width: variant.width, url: variant.url }));
+  const fallback = sources.find((source) => source.width >= 1600) ?? sources.at(-1) ?? null;
   const camera = [photo.cameraMake, photo.cameraModel].filter(Boolean).join(" ");
 
   return {

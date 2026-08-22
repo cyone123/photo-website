@@ -68,7 +68,7 @@ function previewUrl(
   variants: Array<{ width: number; format: string; objectKey: string }>,
 ): string | null {
   const candidates = variants
-    .filter((variant) => variant.format === "webp")
+    .filter((variant) => variant.format === "avif")
     .sort((left, right) => left.width - right.width);
   const selected = candidates.find((variant) => variant.width >= 640) ?? candidates.at(-1);
   return selected ? getPublicImageUrl(selected.objectKey) : null;

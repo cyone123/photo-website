@@ -45,7 +45,7 @@ pnpm photo album chapter japan-2026 --photo <photo-id> --title "清晨" --text "
 1. 校验图片并读取 EXIF；
 2. 计算原文件 SHA-256，避免重复照片；
 3. 创建或复用相册；
-4. 生成方向校正后的 480、960、1600、2400px AVIF 与 WebP 变体，并计算 BlurHash；
+4. 生成方向校正后的 480、960、1600、2400px AVIF 变体，并计算 BlurHash；
 5. 把原图写入私有 R2 Bucket，把变体写入公开 R2 Bucket；
 6. 写入 PostgreSQL，并将照片状态从 `PROCESSING` 更新为 `READY`；
 7. 发生失败时标记为 `FAILED`，下次重复运行可以继续导入。

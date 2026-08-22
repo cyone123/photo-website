@@ -90,12 +90,6 @@ export function ResponsivePhotoImage({
 }: ResponsivePhotoImageProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const [loaded, setLoaded] = useState(false);
-  const webpVariants = photo.variants
-    .filter(
-      (variant): variant is typeof variant & { url: string } =>
-        variant.format === "webp" && Boolean(variant.url),
-    )
-    .sort((left, right) => left.width - right.width);
   const avifVariants = photo.variants
     .filter(
       (variant): variant is typeof variant & { url: string } =>
@@ -103,7 +97,7 @@ export function ResponsivePhotoImage({
     )
     .sort((left, right) => left.width - right.width);
   const fallback =
-    webpVariants.find((variant) => variant.width >= preferredWidth) ?? webpVariants.at(-1);
+    avifVariants.find((variant) => variant.width >= preferredWidth) ?? avifVariants.at(-1);
 
   useEffect(() => {
     if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
@@ -121,18 +115,6 @@ export function ResponsivePhotoImage({
     <>
       {photo.blurhash ? <BlurhashCanvas hash={photo.blurhash} hidden={loaded} /> : null}
       <picture className="responsive-photo-picture">
-        {avifVariants.length > 0 ? (
-          <source
-            type="image/avif"
-            srcSet={avifVariants.map((variant) => `${variant.url} ${variant.width}w`).join(", ")}
-            sizes={sizes}
-          />
-        ) : null}
-        <source
-          type="image/webp"
-          srcSet={webpVariants.map((variant) => `${variant.url} ${variant.width}w`).join(", ")}
-          sizes={sizes}
-        />
         <img
           ref={imageRef}
           className={
@@ -141,7 +123,7 @@ export function ResponsivePhotoImage({
               : undefined
           }
           src={fallback.url}
-          srcSet={webpVariants.map((variant) => `${variant.url} ${variant.width}w`).join(", ")}
+          srcSet={avifVariants.map((variant) => `${variant.url} ${variant.width}w`).join(", ")}
           sizes={sizes}
           width={photo.width}
           height={photo.height}

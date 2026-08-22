@@ -19,7 +19,7 @@ export default async function AdminUploadsPage({
         <div>
           <span className="label">Upload Pipeline</span>
           <h1>上传任务</h1>
-          <p>原图直传私有 R2；服务端随后解析 EXIF、去重并生成 AVIF/WebP 公开变体。</p>
+          <p>原图直传私有 R2；服务端随后解析 EXIF、去重并生成 AVIF 公开变体。</p>
         </div>
       </header>
       {albums.length > 0 ? (

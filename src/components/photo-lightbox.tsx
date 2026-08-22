@@ -36,14 +36,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
     useState<LightboxTransitionDirection>("initial");
   const photo = activeIndex === null ? null : photos[activeIndex];
   const canNavigate = photos.length > 1;
-  const avifSourceSet = photo?.sources
-    .filter((source) => source.format === "avif")
-    .map((source) => `${source.url} ${source.width}w`)
-    .join(", ");
-  const webpSourceSet = photo?.sources
-    .filter((source) => source.format === "webp")
-    .map((source) => `${source.url} ${source.width}w`)
-    .join(", ");
+  const sourceSet = photo?.sources.map((source) => `${source.url} ${source.width}w`).join(", ");
 
   const close = useCallback(() => {
     setTransitionDirection("initial");
@@ -118,7 +111,6 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
       const image = new Image();
       image.src = adjacentPhoto.fallbackUrl;
       image.srcset = adjacentPhoto.sources
-        .filter((source) => source.format === "webp")
         .map((source) => `${source.url} ${source.width}w`)
         .join(", ");
       image.sizes = "(max-width: 640px) 100vw, calc(100vw - 168px)";
@@ -215,23 +207,16 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
                 key={photo.id}
                 className={`photo-lightbox-picture photo-lightbox-picture-${transitionDirection}`}
               >
-                {avifSourceSet ? (
+                {sourceSet ? (
                   <source
                     type="image/avif"
-                    srcSet={avifSourceSet}
-                    sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
-                  />
-                ) : null}
-                {webpSourceSet ? (
-                  <source
-                    type="image/webp"
-                    srcSet={webpSourceSet}
+                    srcSet={sourceSet}
                     sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
                   />
                 ) : null}
                 <img
                   src={photo.fallbackUrl}
-                  srcSet={webpSourceSet}
+                  srcSet={sourceSet}
                   sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
                   alt={photo.title}
                   decoding="async"

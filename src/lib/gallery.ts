@@ -114,7 +114,7 @@ function getPublicImageUrl(objectKey: string) {
 
 function chooseVariant(variants: GalleryVariant[], preferredWidth: number) {
   const usable = variants
-    .filter((variant) => variant.format === "webp")
+    .filter((variant) => variant.format === "avif")
     .sort((left, right) => left.width - right.width);
 
   return usable.find((variant) => variant.width >= preferredWidth) ?? usable.at(-1) ?? null;
@@ -152,10 +152,12 @@ function toGalleryPhoto(
   photo: PhotoWithVariants,
   photoAlbums: Array<{ slug: string; title: string }> = [],
 ): GalleryPhoto {
-  const variants = photo.variants.map((variant) => ({
-    ...variant,
-    url: getPublicImageUrl(variant.objectKey),
-  }));
+  const variants = photo.variants
+    .filter((variant) => variant.format === "avif")
+    .map((variant) => ({
+      ...variant,
+      url: getPublicImageUrl(variant.objectKey),
+    }));
   const preview = chooseVariant(variants, 640);
   const detail = chooseVariant(variants, 1600);
 

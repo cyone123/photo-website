@@ -1,6 +1,6 @@
 export const PUBLIC_IMAGE_WIDTHS = [480, 960, 1600, 2400] as const;
 
-export const PUBLIC_IMAGE_FORMATS = ["avif", "webp"] as const;
+export const PUBLIC_IMAGE_FORMATS = ["avif"] as const;
 
 export type PublicImageFormat = (typeof PUBLIC_IMAGE_FORMATS)[number];
 

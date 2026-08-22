@@ -1,6 +1,6 @@
 import { encode } from "blurhash";
 import sharp from "sharp";
-import { getVariantWidths, PUBLIC_IMAGE_FORMATS, type PublicImageFormat } from "./variant-config";
+import { getVariantWidths, type PublicImageFormat } from "./variant-config";
 
 export type { PublicImageFormat } from "./variant-config";
 
@@ -9,7 +9,7 @@ export interface GeneratedVariant {
   width: number;
   height: number;
   format: PublicImageFormat;
-  mimeType: "image/avif" | "image/webp";
+  mimeType: "image/avif";
   buffer: Buffer;
   byteSize: number;
 }
@@ -25,33 +25,25 @@ export async function generatePublicVariants(buffer: Buffer, maxDimension: numbe
       fit: "inside",
       withoutEnlargement: true,
     });
-    const outputs = await Promise.all(
-      PUBLIC_IMAGE_FORMATS.map(async (format) => {
-        const output = await (
-          format === "avif"
-            ? pipeline.clone().avif({ quality: 62, effort: 4 })
-            : pipeline.clone().webp({ quality: 82, effort: 4 })
-        ).toBuffer({ resolveWithObject: true });
+    const output = await pipeline.clone().avif({ quality: 62, effort: 4 }).toBuffer({
+      resolveWithObject: true,
+    });
 
-        if (!output.info.width || !output.info.height) {
-          throw new Error(
-            `Unable to determine generated ${format} variant dimensions for ${targetWidth}px.`,
-          );
-        }
+    if (!output.info.width || !output.info.height) {
+      throw new Error(
+        `Unable to determine generated avif variant dimensions for ${targetWidth}px.`,
+      );
+    }
 
-        return {
-          targetWidth,
-          width: output.info.width,
-          height: output.info.height,
-          format,
-          mimeType: `image/${format}` as const,
-          buffer: output.data,
-          byteSize: output.data.byteLength,
-        };
-      }),
-    );
-
-    variants.push(...outputs);
+    variants.push({
+      targetWidth,
+      width: output.info.width,
+      height: output.info.height,
+      format: "avif",
+      mimeType: "image/avif",
+      buffer: output.data,
+      byteSize: output.data.byteLength,
+    });
   }
 
   return variants;

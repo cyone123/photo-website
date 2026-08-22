@@ -7,7 +7,7 @@ export function originalObjectKey(photoId: string, extension: string) {
 export function publicVariantObjectKey(
   photoId: string,
   width: number,
-  format: PublicImageFormat = "webp",
+  format: PublicImageFormat = "avif",
 ) {
   return `photos/${photoId}/${width}.${format}`;
 }
