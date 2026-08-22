@@ -22,6 +22,8 @@ import { generatePhotoBlurhash, generatePublicVariants } from "./variants";
 type PhotoRecord = typeof photos.$inferSelect;
 type GeneratedVariants = Awaited<ReturnType<typeof generatePublicVariants>>;
 
+const albumLinkTails = new Map<string, Promise<void>>();
+
 export type BackgroundTaskScheduler = (task: () => Promise<void>) => void;
 
 export interface ProcessPhotoSourceInput {
@@ -180,6 +182,26 @@ function resolvedPhotoTitle(originalFilename: string, requestedTitle?: string | 
 
   const title = path.parse(originalFilename).name.trim();
   return title || null;
+}
+
+async function withAlbumLinkLock<T>(albumId: string, task: () => Promise<T>) {
+  const previous = albumLinkTails.get(albumId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  albumLinkTails.set(albumId, current);
+
+  try {
+    await previous;
+    return await task();
+  } finally {
+    release();
+
+    if (albumLinkTails.get(albumId) === current) {
+      albumLinkTails.delete(albumId);
+    }
+  }
 }
 
 async function updatePreparedPhoto(
@@ -469,44 +491,46 @@ export async function markPhotoFailed(photoId: string, error: unknown) {
 }
 
 export async function linkPhotoToAlbum(albumId: string, photoId: string) {
-  const db = getDb();
-  const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
+  return withAlbumLinkLock(albumId, async () => {
+    const db = getDb();
+    const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
 
-  if (!album) {
-    throw new Error(`Album not found: ${albumId}`);
-  }
+    if (!album) {
+      throw new Error(`Album not found: ${albumId}`);
+    }
 
-  const existing = await db
-    .select()
-    .from(albumPhotos)
-    .where(and(eq(albumPhotos.albumId, album.id), eq(albumPhotos.photoId, photoId)))
-    .limit(1);
+    const existing = await db
+      .select()
+      .from(albumPhotos)
+      .where(and(eq(albumPhotos.albumId, album.id), eq(albumPhotos.photoId, photoId)))
+      .limit(1);
 
-  if (existing[0]) {
-    return;
-  }
+    if (existing[0]) {
+      return;
+    }
 
-  const lastPosition = await db
-    .select({ value: max(albumPhotos.sortOrder) })
-    .from(albumPhotos)
-    .where(eq(albumPhotos.albumId, album.id));
-  const sortOrder = Number(lastPosition[0]?.value ?? -1) + 1;
+    const lastPosition = await db
+      .select({ value: max(albumPhotos.sortOrder) })
+      .from(albumPhotos)
+      .where(eq(albumPhotos.albumId, album.id));
+    const sortOrder = Number(lastPosition[0]?.value ?? -1) + 1;
 
-  await db
-    .insert(albumPhotos)
-    .values({
-      albumId: album.id,
-      photoId,
-      sortOrder,
-    })
-    .onConflictDoNothing({ target: [albumPhotos.albumId, albumPhotos.photoId] });
-
-  if (album.coverPhotoId === null) {
     await db
-      .update(albums)
-      .set({ coverPhotoId: photoId, updatedAt: new Date() })
-      .where(and(eq(albums.id, album.id), isNull(albums.coverPhotoId)));
-  }
+      .insert(albumPhotos)
+      .values({
+        albumId: album.id,
+        photoId,
+        sortOrder,
+      })
+      .onConflictDoNothing({ target: [albumPhotos.albumId, albumPhotos.photoId] });
+
+    if (album.coverPhotoId === null) {
+      await db
+        .update(albums)
+        .set({ coverPhotoId: photoId, updatedAt: new Date() })
+        .where(and(eq(albums.id, album.id), isNull(albums.coverPhotoId)));
+    }
+  });
 }
 
 export async function processPhotoSource(
@@ -546,6 +570,8 @@ export async function processInspectedPhotoSource(
   const totalStartedAt = startTimer();
   const { inspection } = input;
   const title = resolvedPhotoTitle(inspection.originalFilename, input.title);
+  // Only embedded EXIF location is needed while hashing and deduplicating.
+  // Reverse geocoding is scheduled after the photo is ready, so duplicates never wait on it.
   const location = embeddedPhotoLocation(inspection);
   const prepareStartedAt = startTimer();
   const prepared = await preparePhotoRecord({

@@ -9,6 +9,7 @@ import {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_FILES,
   ORIGINAL_UPLOAD_CACHE_CONTROL,
+  PHOTO_PROCESSING_CONCURRENCY,
   type InitializedUpload,
   type UploadTaskView,
   uploadFileExtension,
@@ -39,6 +40,44 @@ export const createUploadBatchSchema = z.object({
 });
 
 type UploadRecord = typeof photoUploads.$inferSelect;
+type BackgroundTaskCompletionHandler = (task: UploadTaskView | null) => void | Promise<void>;
+
+let activePhotoProcessing = 0;
+const photoProcessingQueue: Array<{
+  task: () => Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+function drainPhotoProcessingQueue() {
+  while (activePhotoProcessing < PHOTO_PROCESSING_CONCURRENCY) {
+    const next = photoProcessingQueue.shift();
+
+    if (!next) {
+      return;
+    }
+
+    activePhotoProcessing += 1;
+    void (async () => {
+      try {
+        await next.task();
+        next.resolve();
+      } catch (error) {
+        next.reject(error);
+      } finally {
+        activePhotoProcessing -= 1;
+        drainPhotoProcessingQueue();
+      }
+    })();
+  }
+}
+
+function enqueuePhotoProcessing(task: () => Promise<void>) {
+  return new Promise<void>((resolve, reject) => {
+    photoProcessingQueue.push({ task, resolve, reject });
+    drainPhotoProcessingQueue();
+  });
+}
 
 export class UploadServiceError extends Error {
   constructor(
@@ -401,6 +440,7 @@ async function processClaimedUpload(
 export async function completeUploadTask(
   idInput: string,
   scheduleBackgroundTask?: BackgroundTaskScheduler,
+  onBackgroundComplete?: BackgroundTaskCompletionHandler,
 ) {
   const task = await uploadById(idInput);
 
@@ -435,6 +475,28 @@ export async function completeUploadTask(
   const claimStartedAt = startTimer();
   const claimed = await claimUpload(task);
   logDuration("admin.upload.stage", { uploadId: task.id, stage: "claim_task" }, claimStartedAt);
+
+  if (scheduleBackgroundTask) {
+    scheduleBackgroundTask(() =>
+      enqueuePhotoProcessing(async () => {
+        const completedTask = await processClaimedUpload(
+          claimed,
+          object.etag,
+          scheduleBackgroundTask,
+        );
+        await onBackgroundComplete?.(completedTask);
+      }),
+    );
+
+    const processingTask = uploadTaskView({ ...claimed, album: task.album });
+
+    structuredUploadLog("admin.upload.processing_scheduled", {
+      uploadId: claimed.id,
+      albumId: claimed.albumId,
+    });
+    return processingTask;
+  }
+
   return processClaimedUpload(claimed, object.etag, scheduleBackgroundTask);
 }
 
@@ -477,6 +539,7 @@ async function renewUpload(task: UploadRecord) {
 export async function retryUploadTask(
   idInput: string,
   scheduleBackgroundTask?: BackgroundTaskScheduler,
+  onBackgroundComplete?: BackgroundTaskCompletionHandler,
 ) {
   const task = await uploadById(idInput);
 
@@ -508,6 +571,6 @@ export async function retryUploadTask(
 
   return {
     action: "processing" as const,
-    task: await completeUploadTask(task.id, scheduleBackgroundTask),
+    task: await completeUploadTask(task.id, scheduleBackgroundTask, onBackgroundComplete),
   };
 }

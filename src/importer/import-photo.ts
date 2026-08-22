@@ -14,6 +14,7 @@ type AlbumRecord = typeof albums.$inferSelect;
 export interface ImportPhotoOptions {
   filePath: string;
   albumSlug: string;
+  albumId?: string;
   albumTitle?: string;
   photoTitle?: string;
   dryRun?: boolean;
@@ -25,6 +26,11 @@ export interface ImportPhotoResult {
   filePath: string;
   photoId?: string;
   variantCount: number;
+  albumSlug: string;
+}
+
+export interface PreparedImportAlbum {
+  album: AlbumRecord;
   albumSlug: string;
 }
 
@@ -46,6 +52,14 @@ function titleFromSlug(slug: string) {
 }
 
 export { normalizeAlbumSlug } from "@/lib/album-slug";
+
+export async function prepareImportAlbum(
+  albumSlugInput: string,
+  albumTitle?: string,
+): Promise<PreparedImportAlbum> {
+  const albumSlug = normalizeAlbumSlug(albumSlugInput);
+  return { album: await ensureAlbum(albumSlug, albumTitle), albumSlug };
+}
 
 async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
   const db = getDb();
@@ -139,7 +153,9 @@ export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPh
   );
   readImportEnv();
   const albumSlug = normalizeAlbumSlug(options.albumSlug);
-  const album = await ensureAlbum(albumSlug, options.albumTitle);
+  const album = options.albumId
+    ? { id: options.albumId }
+    : await ensureAlbum(albumSlug, options.albumTitle);
   const result = await processInspectedPhotoSource({
     inspection: source,
     albumId: album.id,

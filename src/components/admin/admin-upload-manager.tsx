@@ -136,10 +136,74 @@ export function AdminUploadManager({
     return () => window.clearInterval(timer);
   }, [refreshTasks, tasks]);
 
+  useEffect(() => {
+    if (tasks.length === 0) {
+      return;
+    }
+
+    setQueue((current) => {
+      let changed = false;
+      const next = current.map((item) => {
+        if (!item.uploadId) {
+          return item;
+        }
+
+        const task = tasks.find((candidate) => candidate.id === item.uploadId);
+
+        if (!task) {
+          return item;
+        }
+
+        if (task.status === "SUCCEEDED") {
+          if (
+            item.status === "succeeded" &&
+            item.deduplicated === task.deduplicated &&
+            item.error === undefined
+          ) {
+            return item;
+          }
+
+          changed = true;
+          return {
+            ...item,
+            status: "succeeded" as const,
+            progress: 100,
+            deduplicated: task.deduplicated,
+            error: undefined,
+          };
+        }
+
+        if (task.status === "FAILED") {
+          const error = task.failureMessage ?? "照片处理失败。";
+
+          if (item.status === "failed" && item.error === error) {
+            return item;
+          }
+
+          changed = true;
+          return { ...item, status: "failed" as const, error };
+        }
+
+        if (task.status === "PROCESSING" || task.status === "UPLOADED") {
+          if (item.status === "processing" && item.progress === 100 && item.error === undefined) {
+            return item;
+          }
+
+          changed = true;
+          return { ...item, status: "processing" as const, progress: 100, error: undefined };
+        }
+
+        return item;
+      });
+
+      return changed ? next : current;
+    });
+  }, [tasks]);
+
   const workInProgress =
     starting ||
     queue.some((item) => item.status === "uploading" || item.status === "processing") ||
-    tasks.some((task) => task.status === "PROCESSING") ||
+    tasks.some((task) => task.status === "PROCESSING" || task.status === "UPLOADED") ||
     retryingIds.size > 0;
 
   useEffect(() => {
@@ -193,11 +257,20 @@ export function AdminUploadManager({
       const result = await responseJson<{ task: UploadTaskView }>(
         await fetch(`/api/admin/uploads/${upload.uploadId}/complete`, { method: "POST" }),
       );
-      updateQueue(item.key, {
-        status: "succeeded",
-        deduplicated: result.task.deduplicated,
-        error: undefined,
-      });
+      if (result.task.status === "SUCCEEDED") {
+        updateQueue(item.key, {
+          status: "succeeded",
+          deduplicated: result.task.deduplicated,
+          error: undefined,
+        });
+      } else if (result.task.status === "FAILED") {
+        updateQueue(item.key, {
+          status: "failed",
+          error: result.task.failureMessage ?? "照片处理失败。",
+        });
+      } else {
+        updateQueue(item.key, { status: "processing", progress: 100, error: undefined });
+      }
     } catch (error) {
       updateQueue(item.key, {
         status: "failed",

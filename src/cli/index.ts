@@ -2,11 +2,14 @@ import path from "node:path";
 import { readImportEnv } from "@/config/env";
 import { loadProjectEnv } from "@/config/load-env";
 import { collectImageFiles } from "@/importer/file-utils";
-import { dryRunPhotoImport, importPhoto } from "@/importer/import-photo";
+import { dryRunPhotoImport, importPhoto, prepareImportAlbum } from "@/importer/import-photo";
 import { inspectImage } from "@/importer/inspect-image";
 import { setAlbumChapter, updateAlbum } from "@/importer/manage-album";
 import { updatePhoto } from "@/importer/manage-photo";
 import { revalidatePublishedGallery } from "@/importer/revalidate-site";
+
+const DEFAULT_IMPORT_CONCURRENCY = 2;
+const MAX_IMPORT_CONCURRENCY = 4;
 
 function printHelp() {
   console.log(`Photo Website CLI
@@ -30,6 +33,7 @@ Import options:
   --title <title>         Custom title for one photo; defaults to its filename.
   --dry-run               Parse and process locally without database or R2 writes.
   --force                 Re-upload an already READY photo.
+  --concurrency <1-4>     Photos processed concurrently (default: 2).
   --help                  Show this help.
 
 Photo update options:
@@ -65,6 +69,7 @@ interface ImportArguments {
   photoTitle?: string;
   dryRun: boolean;
   force: boolean;
+  concurrency: number;
 }
 
 function parseImportArguments(args: string[]): ImportArguments | null {
@@ -74,6 +79,7 @@ function parseImportArguments(args: string[]): ImportArguments | null {
   let photoTitle: string | undefined;
   let dryRun = false;
   let force = false;
+  let concurrency = DEFAULT_IMPORT_CONCURRENCY;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -89,6 +95,28 @@ function parseImportArguments(args: string[]): ImportArguments | null {
 
     if (arg === "--force") {
       force = true;
+      continue;
+    }
+
+    if (arg === "--concurrency") {
+      const value = args[index + 1];
+
+      if (!value || value.startsWith("--")) {
+        throw new Error(`${arg} requires a value.`);
+      }
+
+      const parsedConcurrency = Number(value);
+
+      if (
+        !Number.isInteger(parsedConcurrency) ||
+        parsedConcurrency < 1 ||
+        parsedConcurrency > MAX_IMPORT_CONCURRENCY
+      ) {
+        throw new Error(`--concurrency must be an integer from 1 to ${MAX_IMPORT_CONCURRENCY}.`);
+      }
+
+      concurrency = parsedConcurrency;
+      index += 1;
       continue;
     }
 
@@ -122,7 +150,7 @@ function parseImportArguments(args: string[]): ImportArguments | null {
     throw new Error("--album is required for photo import.");
   }
 
-  return { inputPaths, albumSlug, albumTitle, photoTitle, dryRun, force };
+  return { inputPaths, albumSlug, albumTitle, photoTitle, dryRun, force, concurrency };
 }
 
 function formatError(error: unknown) {
@@ -152,45 +180,61 @@ async function runImport(args: string[]) {
     readImportEnv();
   }
 
+  const preparedAlbum = parsed.dryRun
+    ? undefined
+    : await prepareImportAlbum(parsed.albumSlug, parsed.albumTitle);
+
   let imported = 0;
   let skipped = 0;
   let failed = 0;
 
-  console.log(`${parsed.dryRun ? "Checking" : "Importing"} ${files.length} image(s)...`);
+  console.log(
+    `${parsed.dryRun ? "Checking" : "Importing"} ${files.length} image(s) with concurrency ${parsed.concurrency}...`,
+  );
 
-  for (const filePath of files) {
-    try {
-      const result = parsed.dryRun
-        ? await dryRunPhotoImport({
-            filePath,
-            albumSlug: parsed.albumSlug,
-            albumTitle: parsed.albumTitle,
-            photoTitle: parsed.photoTitle,
-            dryRun: true,
-            force: parsed.force,
-          })
-        : await importPhoto({
-            filePath,
-            albumSlug: parsed.albumSlug,
-            albumTitle: parsed.albumTitle,
-            photoTitle: parsed.photoTitle,
-            force: parsed.force,
-          });
+  let cursor = 0;
+  const workerCount = Math.min(parsed.concurrency, files.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (cursor < files.length) {
+      const filePath = files[cursor];
+      cursor += 1;
 
-      if (result.status === "imported") {
-        imported += 1;
-        console.log(`[imported] ${result.filePath} (${result.variantCount} variants)`);
-      } else if (result.status === "skipped") {
-        skipped += 1;
-        console.log(`[skipped]  ${result.filePath} (${result.photoId})`);
-      } else {
-        console.log(`[dry-run]  ${result.filePath} (${result.variantCount} variants)`);
+      try {
+        const result = parsed.dryRun
+          ? await dryRunPhotoImport({
+              filePath,
+              albumSlug: parsed.albumSlug,
+              albumTitle: parsed.albumTitle,
+              photoTitle: parsed.photoTitle,
+              dryRun: true,
+              force: parsed.force,
+            })
+          : await importPhoto({
+              filePath,
+              albumSlug: preparedAlbum?.albumSlug ?? parsed.albumSlug,
+              albumId: preparedAlbum?.album.id,
+              albumTitle: parsed.albumTitle,
+              photoTitle: parsed.photoTitle,
+              force: parsed.force,
+            });
+
+        if (result.status === "imported") {
+          imported += 1;
+          console.log(`[imported] ${result.filePath} (${result.variantCount} variants)`);
+        } else if (result.status === "skipped") {
+          skipped += 1;
+          console.log(`[skipped]  ${result.filePath} (${result.photoId})`);
+        } else {
+          console.log(`[dry-run]  ${result.filePath} (${result.variantCount} variants)`);
+        }
+      } catch (error) {
+        failed += 1;
+        console.error(`[failed]   ${path.resolve(filePath)}: ${formatError(error)}`);
       }
-    } catch (error) {
-      failed += 1;
-      console.error(`[failed]   ${path.resolve(filePath)}: ${formatError(error)}`);
     }
-  }
+  });
+
+  await Promise.all(workers);
 
   console.log(`Summary: ${imported} imported, ${skipped} skipped, ${failed} failed.`);
 

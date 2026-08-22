@@ -1,6 +1,7 @@
 export const MAX_UPLOAD_FILES = 20;
 export const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
 export const UPLOAD_CONCURRENCY = 2;
+export const PHOTO_PROCESSING_CONCURRENCY = 2;
 export const UPLOAD_URL_TTL_SECONDS = 10 * 60;
 export const ORIGINAL_UPLOAD_CACHE_CONTROL = "private, no-store";
 
