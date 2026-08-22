@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "photo": "tsx src/cli/index.ts"
+    "photo": "tsx src/cli/index.ts",
+    "admin:init": "tsx src/cli/create-admin.ts"
   },
   "engines": {
     "node": ">=20.9.0"
@@ -22,7 +23,9 @@
   "packageManager": "pnpm@10.34.1",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1113.0",
+    "@better-auth/drizzle-adapter": "^1.7.1",
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "^1.7.1",
     "blurhash": "^2.0.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",

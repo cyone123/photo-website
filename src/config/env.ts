@@ -19,6 +19,9 @@ const serverEnvSchema = z.object({
   R2_PRIVATE_BUCKET: optionalNonEmptyString,
   R2_PUBLIC_BASE_URL: optionalUrl,
   REVALIDATE_SECRET: optionalNonEmptyString,
+  BETTER_AUTH_SECRET: optionalNonEmptyString,
+  BETTER_AUTH_URL: optionalUrl,
+  ADMIN_EMAIL: z.preprocess((value) => (value === "" ? undefined : value), z.email().optional()),
 });
 
 const importEnvSchema = serverEnvSchema.extend({
@@ -31,10 +34,20 @@ const importEnvSchema = serverEnvSchema.extend({
   SITE_REVALIDATE_URL: optionalUrl,
 });
 
+const adminInitEnvSchema = serverEnvSchema.extend({
+  DATABASE_URL: z.string().min(1),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.url(),
+});
+
 export function readServerEnv() {
   return serverEnvSchema.parse(process.env);
 }
 
 export function readImportEnv() {
   return importEnvSchema.parse(process.env);
+}
+
+export function readAdminInitEnv() {
+  return adminInitEnvSchema.parse(process.env);
 }

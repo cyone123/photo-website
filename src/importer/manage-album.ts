@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { albumPhotos, albums } from "@/db/schema";
-import { normalizeAlbumSlug } from "@/importer/import-photo";
+import { normalizeAlbumSlug } from "@/lib/album-slug";
 
 export type UpdateAlbumOptions = {
   slug: string;

@@ -4,6 +4,7 @@ import { readImportEnv } from "@/config/env";
 import { getDb } from "@/db/client";
 import { albums } from "@/db/schema";
 import { inspectPhotoFile } from "@/importer/inspect-image";
+import { normalizeAlbumSlug } from "@/lib/album-slug";
 import { generatePhotoBlurhash, generatePublicVariants } from "@/server/photos/variants";
 import { processInspectedPhotoSource } from "@/server/photos/process-photo";
 
@@ -43,19 +44,7 @@ function titleFromSlug(slug: string) {
     .join(" ");
 }
 
-export function normalizeAlbumSlug(value: string) {
-  const slug = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  if (!slug) {
-    throw new Error("Album slug cannot be empty.");
-  }
-
-  return slug;
-}
+export { normalizeAlbumSlug } from "@/lib/album-slug";
 
 async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
   const db = getDb();
