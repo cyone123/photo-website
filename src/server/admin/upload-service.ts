@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
@@ -15,6 +16,8 @@ import {
   UPLOAD_URL_TTL_SECONDS,
 } from "@/lib/uploads";
 import { originalObjectKey } from "@/server/photos/object-key";
+import type { BackgroundTaskScheduler } from "@/server/photos/process-photo";
+import { logDuration, startTimer } from "@/server/performance-log";
 import {
   createPresignedR2PutUrl,
   deleteR2Object,
@@ -275,17 +278,30 @@ async function photoIdForFailedBuffer(buffer: Buffer) {
   return existing?.id ?? null;
 }
 
-async function processClaimedUpload(task: UploadRecord, sourceEtag: string | null) {
+async function processClaimedUpload(
+  task: UploadRecord,
+  sourceEtag: string | null,
+  scheduleBackgroundTask?: BackgroundTaskScheduler,
+) {
   const { privateBucket } = getR2Buckets();
+  const totalStartedAt = startTimer();
   let buffer: Buffer | undefined;
 
   try {
+    const downloadStartedAt = startTimer();
     buffer = await getR2ObjectBuffer({
       bucket: privateBucket,
       key: task.objectKey,
       maxBytes: task.expectedByteSize,
       ifMatch: sourceEtag ?? undefined,
     });
+    logDuration(
+      "admin.upload.stage",
+      { uploadId: task.id, stage: "download_original" },
+      downloadStartedAt,
+    );
+
+    const processStartedAt = startTimer();
     const { processPhotoSource } = await import("@/server/photos/process-photo");
     const result = await processPhotoSource({
       buffer,
@@ -298,7 +314,19 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
         objectKey: task.objectKey,
         etag: sourceEtag ?? undefined,
       },
+      scheduleBackgroundTask,
     });
+    logDuration(
+      "admin.upload.stage",
+      {
+        uploadId: task.id,
+        stage: "photo_pipeline",
+        photoId: result.photoId,
+        status: result.status,
+      },
+      processStartedAt,
+    );
+
     const photo = await getDb().query.photos.findFirst({
       columns: { id: true, originalKey: true },
       where: eq(photos.id, result.photoId),
@@ -316,6 +344,7 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
       await deleteR2Object({ bucket: privateBucket, key: task.objectKey });
     }
 
+    const finalizeStartedAt = startTimer();
     const now = new Date();
     await getDb()
       .update(photoUploads)
@@ -328,6 +357,11 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
         updatedAt: now,
       })
       .where(and(eq(photoUploads.id, task.id), eq(photoUploads.status, "PROCESSING")));
+    logDuration(
+      "admin.upload.stage",
+      { uploadId: task.id, stage: "finalize_task", photoId: photo.id },
+      finalizeStartedAt,
+    );
     structuredUploadLog("admin.upload.succeeded", {
       uploadId: task.id,
       albumId: task.albumId,
@@ -335,6 +369,15 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
       deduplicated,
       variantCount: result.variantCount,
     });
+    logDuration(
+      "admin.upload.total",
+      {
+        uploadId: task.id,
+        photoId: photo.id,
+        status: "succeeded",
+      },
+      totalStartedAt,
+    );
     return getAdminUploadTask(task.id);
   } catch (error) {
     const photoId = buffer ? await photoIdForFailedBuffer(buffer) : null;
@@ -347,6 +390,7 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
         albumId: task.albumId,
         photoId,
         message: failureMessage,
+        durationMs: Math.max(0, Math.round(performance.now() - totalStartedAt)),
         timestamp: new Date().toISOString(),
       }),
     );
@@ -354,7 +398,10 @@ async function processClaimedUpload(task: UploadRecord, sourceEtag: string | nul
   }
 }
 
-export async function completeUploadTask(idInput: string) {
+export async function completeUploadTask(
+  idInput: string,
+  scheduleBackgroundTask?: BackgroundTaskScheduler,
+) {
   const task = await uploadById(idInput);
 
   if (!task) {
@@ -369,6 +416,7 @@ export async function completeUploadTask(idInput: string) {
     throw new UploadServiceError("该上传任务正在处理。", 409);
   }
 
+  const verifyStartedAt = startTimer();
   const object = await verifyUploadedObject(task).catch(async (error: unknown) => {
     await getDb()
       .update(photoUploads)
@@ -378,8 +426,16 @@ export async function completeUploadTask(idInput: string) {
       );
     throw error;
   });
+  logDuration(
+    "admin.upload.stage",
+    { uploadId: task.id, stage: "verify_original" },
+    verifyStartedAt,
+  );
 
-  return processClaimedUpload(await claimUpload(task), object.etag);
+  const claimStartedAt = startTimer();
+  const claimed = await claimUpload(task);
+  logDuration("admin.upload.stage", { uploadId: task.id, stage: "claim_task" }, claimStartedAt);
+  return processClaimedUpload(claimed, object.etag, scheduleBackgroundTask);
 }
 
 async function renewUpload(task: UploadRecord) {
@@ -418,7 +474,10 @@ async function renewUpload(task: UploadRecord) {
   };
 }
 
-export async function retryUploadTask(idInput: string) {
+export async function retryUploadTask(
+  idInput: string,
+  scheduleBackgroundTask?: BackgroundTaskScheduler,
+) {
   const task = await uploadById(idInput);
 
   if (!task) {
@@ -447,5 +506,8 @@ export async function retryUploadTask(idInput: string) {
     return renewUpload(task);
   }
 
-  return { action: "processing" as const, task: await completeUploadTask(task.id) };
+  return {
+    action: "processing" as const,
+    task: await completeUploadTask(task.id, scheduleBackgroundTask),
+  };
 }

@@ -1,8 +1,29 @@
+import { readServerEnv } from "@/config/env";
 import type { InspectedPhotoBuffer } from "./inspect-photo";
 
 export interface PhotoLocation {
   city: string | null;
   district: string | null;
+}
+
+export function embeddedPhotoLocation(photo: InspectedPhotoBuffer): PhotoLocation {
+  return {
+    city: photo.locationCity,
+    district: photo.locationDistrict,
+  };
+}
+
+export function hasPhotoCoordinates(photo: InspectedPhotoBuffer) {
+  return (
+    photo.latitude !== null &&
+    photo.longitude !== null &&
+    Number.isFinite(photo.latitude) &&
+    Number.isFinite(photo.longitude)
+  );
+}
+
+export function isPhotoLocationEnabled() {
+  return readServerEnv().PHOTO_LOCATION_ENABLED;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -12,6 +33,7 @@ const NOMINATIM_USER_AGENT = "photo-website/0.1 (photo metadata importer)";
 const MIN_REQUEST_INTERVAL_MS = 1100;
 
 let lastRequestAt = 0;
+let rateLimitTail = Promise.resolve();
 const locationCache = new Map<string, Promise<PhotoLocation>>();
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -62,13 +84,18 @@ function locationFromAddress(address: JsonRecord): PhotoLocation {
 }
 
 async function waitForRateLimit() {
-  const waitMs = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now());
+  const current = rateLimitTail.then(async () => {
+    const waitMs = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now());
 
-  if (waitMs > 0) {
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-  }
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
 
-  lastRequestAt = Date.now();
+    lastRequestAt = Date.now();
+  });
+
+  rateLimitTail = current.catch(() => undefined);
+  await current;
 }
 
 async function fetchLocation(latitude: number, longitude: number): Promise<PhotoLocation> {
@@ -108,6 +135,10 @@ export function reverseGeocodePhotoLocation(
   latitude: number | null,
   longitude: number | null,
 ): Promise<PhotoLocation> {
+  if (!isPhotoLocationEnabled()) {
+    return Promise.resolve({ city: null, district: null });
+  }
+
   if (
     latitude === null ||
     longitude === null ||
@@ -134,10 +165,11 @@ export function reverseGeocodePhotoLocation(
 }
 
 export async function resolvePhotoLocation(photo: InspectedPhotoBuffer): Promise<PhotoLocation> {
-  const embedded = {
-    city: photo.locationCity,
-    district: photo.locationDistrict,
-  };
+  const embedded = embeddedPhotoLocation(photo);
+
+  if (!isPhotoLocationEnabled()) {
+    return embedded;
+  }
 
   if (embedded.city && embedded.district) {
     return embedded;

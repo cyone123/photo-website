@@ -1,6 +1,10 @@
 import { encode } from "blurhash";
 import sharp from "sharp";
-import { getVariantWidths, type PublicImageFormat } from "./variant-config";
+import {
+  getVariantWidths,
+  PUBLIC_IMAGE_AVIF_EFFORT,
+  type PublicImageFormat,
+} from "./variant-config";
 
 export type { PublicImageFormat } from "./variant-config";
 
@@ -25,9 +29,12 @@ export async function generatePublicVariants(buffer: Buffer, maxDimension: numbe
       fit: "inside",
       withoutEnlargement: true,
     });
-    const output = await pipeline.clone().avif({ quality: 62, effort: 4 }).toBuffer({
-      resolveWithObject: true,
-    });
+    const output = await pipeline
+      .clone()
+      .avif({ quality: 62, effort: PUBLIC_IMAGE_AVIF_EFFORT })
+      .toBuffer({
+        resolveWithObject: true,
+      });
 
     if (!output.info.width || !output.info.height) {
       throw new Error(

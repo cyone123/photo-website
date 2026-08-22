@@ -5,6 +5,7 @@ import { getDb } from "@/db/client";
 import { albums } from "@/db/schema";
 import { inspectPhotoFile } from "@/importer/inspect-image";
 import { normalizeAlbumSlug } from "@/lib/album-slug";
+import { logDuration, startTimer } from "@/server/performance-log";
 import { generatePhotoBlurhash, generatePublicVariants } from "@/server/photos/variants";
 import { processInspectedPhotoSource } from "@/server/photos/process-photo";
 
@@ -84,11 +85,32 @@ async function ensureAlbum(slug: string, title?: string): Promise<AlbumRecord> {
 }
 
 export async function dryRunPhotoImport(options: ImportPhotoOptions): Promise<ImportPhotoResult> {
+  const inspectionStartedAt = startTimer();
   const source = await inspectPhotoFile(options.filePath);
+  logDuration(
+    "photo.import.stage",
+    {
+      filename: source.originalFilename,
+      stage: "inspect_file",
+      width: source.width,
+      height: source.height,
+    },
+    inspectionStartedAt,
+  );
+  const generationStartedAt = startTimer();
   const [variants] = await Promise.all([
     generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
     generatePhotoBlurhash(source.buffer),
   ]);
+  logDuration(
+    "photo.import.stage",
+    {
+      filename: source.originalFilename,
+      stage: "generate_variants",
+      variantCount: variants.length,
+    },
+    generationStartedAt,
+  );
 
   return {
     status: "dry-run",
@@ -103,7 +125,18 @@ export async function importPhoto(options: ImportPhotoOptions): Promise<ImportPh
     return dryRunPhotoImport(options);
   }
 
+  const inspectionStartedAt = startTimer();
   const source = await inspectPhotoFile(options.filePath);
+  logDuration(
+    "photo.import.stage",
+    {
+      filename: source.originalFilename,
+      stage: "inspect_file",
+      width: source.width,
+      height: source.height,
+    },
+    inspectionStartedAt,
+  );
   readImportEnv();
   const albumSlug = normalizeAlbumSlug(options.albumSlug);
   const album = await ensureAlbum(albumSlug, options.albumTitle);

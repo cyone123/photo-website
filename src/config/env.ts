@@ -10,6 +10,14 @@ const optionalUrl = z.preprocess(
   z.string().url().optional(),
 );
 
+const optionalBoolean = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+);
+
 const serverEnvSchema = z.object({
   DATABASE_URL: optionalNonEmptyString,
   R2_ENDPOINT: optionalUrl,
@@ -18,6 +26,7 @@ const serverEnvSchema = z.object({
   R2_PUBLIC_BUCKET: optionalNonEmptyString,
   R2_PRIVATE_BUCKET: optionalNonEmptyString,
   R2_PUBLIC_BASE_URL: optionalUrl,
+  PHOTO_LOCATION_ENABLED: optionalBoolean,
   REVALIDATE_SECRET: optionalNonEmptyString,
   BETTER_AUTH_SECRET: optionalNonEmptyString,
   BETTER_AUTH_URL: optionalUrl,

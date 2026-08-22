@@ -1,17 +1,28 @@
 import { createHash, randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import path from "node:path";
-import { and, eq, isNull, max } from "drizzle-orm";
+import { and, eq, isNull, max, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { albumPhotos, albums, photoVariants, photos } from "@/db/schema";
 import { ORIGINAL_UPLOAD_CACHE_CONTROL } from "@/lib/uploads";
+import { logDuration, startTimer } from "@/server/performance-log";
 import { copyR2Object, getR2Buckets, putR2Object } from "@/storage/r2";
 import { inspectPhotoBuffer, type InspectedPhotoBuffer } from "./inspect-photo";
 import { originalObjectKey, publicVariantObjectKey } from "./object-key";
-import { resolvePhotoLocation, type PhotoLocation } from "./photo-location";
+import {
+  embeddedPhotoLocation,
+  hasPhotoCoordinates,
+  isPhotoLocationEnabled,
+  resolvePhotoLocation,
+  type PhotoLocation,
+} from "./photo-location";
+import { PUBLIC_VARIANT_UPLOAD_CONCURRENCY } from "./variant-config";
 import { generatePhotoBlurhash, generatePublicVariants } from "./variants";
 
 type PhotoRecord = typeof photos.$inferSelect;
 type GeneratedVariants = Awaited<ReturnType<typeof generatePublicVariants>>;
+
+export type BackgroundTaskScheduler = (task: () => Promise<void>) => void;
 
 export interface ProcessPhotoSourceInput {
   buffer: Buffer;
@@ -24,6 +35,7 @@ export interface ProcessPhotoSourceInput {
   force?: boolean;
   sourceLabel?: string;
   storedOriginal?: StoredOriginalSource;
+  scheduleBackgroundTask?: BackgroundTaskScheduler;
 }
 
 export interface StoredOriginalSource {
@@ -45,6 +57,7 @@ export interface ProcessInspectedPhotoInput {
   replaceTitle?: boolean;
   force?: boolean;
   storedOriginal?: StoredOriginalSource;
+  scheduleBackgroundTask?: BackgroundTaskScheduler;
 }
 
 export interface PreparePhotoRecordInput {
@@ -87,6 +100,67 @@ function locationUpdate(current: PhotoRecord, next: PhotoLocation) {
     ...(next.city && !current.locationCity ? { locationCity: next.city } : {}),
     ...(next.district && !current.locationDistrict ? { locationDistrict: next.district } : {}),
   };
+}
+
+async function enrichPhotoLocation(photo: PhotoRecord, inspection: InspectedPhotoBuffer) {
+  const startedAt = startTimer();
+
+  try {
+    const location = await resolvePhotoLocation(inspection);
+    const updateValues = locationUpdate(photo, location);
+
+    if (Object.keys(updateValues).length > 0) {
+      await getDb()
+        .update(photos)
+        .set({ ...updateValues, updatedAt: new Date() })
+        .where(eq(photos.id, photo.id));
+    }
+
+    logDuration(
+      "photo.process.stage",
+      {
+        photoId: photo.id,
+        filename: inspection.originalFilename,
+        stage: "location_enrichment",
+        updated: Object.keys(updateValues).length > 0,
+      },
+      startedAt,
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "photo.location_enrichment_failed",
+        photoId: photo.id,
+        filename: inspection.originalFilename,
+        message: error instanceof Error ? error.message : String(error),
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  }
+}
+
+function schedulePhotoLocationEnrichment(
+  photo: PhotoRecord,
+  inspection: InspectedPhotoBuffer,
+  scheduleBackgroundTask?: BackgroundTaskScheduler,
+) {
+  if (
+    !isPhotoLocationEnabled() ||
+    !hasPhotoCoordinates(inspection) ||
+    (photo.locationCity !== null && photo.locationDistrict !== null)
+  ) {
+    return;
+  }
+
+  const task = () => enrichPhotoLocation(photo, inspection);
+
+  if (scheduleBackgroundTask) {
+    scheduleBackgroundTask(task);
+  } else {
+    void task();
+  }
 }
 
 function resolvedPhotoTitle(originalFilename: string, requestedTitle?: string | null) {
@@ -252,27 +326,57 @@ async function persistOriginal(
   });
 }
 
-async function uploadPublicVariants(photoId: string, variants: GeneratedVariants) {
-  const { publicBucket } = getR2Buckets();
+async function runWithConcurrency(tasks: Array<() => Promise<void>>, concurrency: number) {
+  let nextIndex = 0;
 
-  for (const variant of variants) {
-    await putR2Object({
-      bucket: publicBucket,
-      key: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
-      body: variant.buffer,
-      contentType: variant.mimeType,
-      cacheControl: "public, max-age=31536000, immutable",
-    });
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const taskIndex = nextIndex;
+      nextIndex += 1;
+      await tasks[taskIndex]();
+    }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(concurrency, 1), tasks.length) }, () => worker()),
+  );
+}
+
+async function uploadR2Artifacts(
+  photo: PhotoRecord,
+  source: InspectedPhotoBuffer,
+  variants: GeneratedVariants,
+  storedOriginal?: StoredOriginalSource,
+) {
+  const { publicBucket } = getR2Buckets();
+  const tasks = [
+    () => persistOriginal(photo, source, storedOriginal),
+    ...variants.map(
+      (variant) => () =>
+        putR2Object({
+          bucket: publicBucket,
+          key: publicVariantObjectKey(photo.id, variant.targetWidth, variant.format),
+          body: variant.buffer,
+          contentType: variant.mimeType,
+          cacheControl: "public, max-age=31536000, immutable",
+        }),
+    ),
+  ];
+
+  await runWithConcurrency(tasks, PUBLIC_VARIANT_UPLOAD_CONCURRENCY);
 }
 
 async function saveVariants(photoId: string, variants: GeneratedVariants) {
   const db = getDb();
 
-  for (const variant of variants) {
-    await db
-      .insert(photoVariants)
-      .values({
+  if (variants.length === 0) {
+    return;
+  }
+
+  await db
+    .insert(photoVariants)
+    .values(
+      variants.map((variant) => ({
         photoId,
         width: variant.width,
         height: variant.height,
@@ -280,17 +384,17 @@ async function saveVariants(photoId: string, variants: GeneratedVariants) {
         mimeType: variant.mimeType,
         objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
         byteSize: variant.byteSize,
-      })
-      .onConflictDoUpdate({
-        target: [photoVariants.photoId, photoVariants.width, photoVariants.format],
-        set: {
-          height: variant.height,
-          mimeType: variant.mimeType,
-          objectKey: publicVariantObjectKey(photoId, variant.targetWidth, variant.format),
-          byteSize: variant.byteSize,
-        },
-      });
-  }
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [photoVariants.photoId, photoVariants.width, photoVariants.format],
+      set: {
+        height: sql`excluded.height`,
+        mimeType: sql`excluded.mime_type`,
+        objectKey: sql`excluded.object_key`,
+        byteSize: sql`excluded.byte_size`,
+      },
+    });
 }
 
 export async function generateAndUploadVariants(
@@ -298,14 +402,48 @@ export async function generateAndUploadVariants(
   source: InspectedPhotoBuffer,
   storedOriginal?: StoredOriginalSource,
 ) {
+  const generationStartedAt = startTimer();
   const [variants, blurhash] = await Promise.all([
     generatePublicVariants(source.buffer, Math.max(source.width, source.height)),
     generatePhotoBlurhash(source.buffer),
   ]);
+  logDuration(
+    "photo.process.stage",
+    {
+      photoId: photo.id,
+      filename: source.originalFilename,
+      stage: "generate_variants",
+      variantCount: variants.length,
+    },
+    generationStartedAt,
+  );
 
-  await persistOriginal(photo, source, storedOriginal);
-  await uploadPublicVariants(photo.id, variants);
+  const uploadStartedAt = startTimer();
+  await uploadR2Artifacts(photo, source, variants, storedOriginal);
+  logDuration(
+    "photo.process.stage",
+    {
+      photoId: photo.id,
+      filename: source.originalFilename,
+      stage: "r2_uploads",
+      variantCount: variants.length,
+      concurrency: PUBLIC_VARIANT_UPLOAD_CONCURRENCY,
+    },
+    uploadStartedAt,
+  );
+
+  const saveStartedAt = startTimer();
   await saveVariants(photo.id, variants);
+  logDuration(
+    "photo.process.stage",
+    {
+      photoId: photo.id,
+      filename: source.originalFilename,
+      stage: "save_variants",
+      variantCount: variants.length,
+    },
+    saveStartedAt,
+  );
 
   return { blurhash, variantCount: variants.length };
 }
@@ -374,11 +512,22 @@ export async function linkPhotoToAlbum(albumId: string, photoId: string) {
 export async function processPhotoSource(
   input: ProcessPhotoSourceInput,
 ): Promise<ProcessPhotoSourceResult> {
+  const inspectionStartedAt = startTimer();
   const inspection = await inspectPhotoBuffer(input.buffer, {
     originalFilename: input.originalFilename,
     mimeType: input.mimeType,
     sourceLabel: input.sourceLabel,
   });
+  logDuration(
+    "photo.process.stage",
+    {
+      filename: inspection.originalFilename,
+      stage: "inspect",
+      width: inspection.width,
+      height: inspection.height,
+    },
+    inspectionStartedAt,
+  );
   return processInspectedPhotoSource({
     inspection,
     reservedPhotoId: input.reservedPhotoId,
@@ -387,15 +536,18 @@ export async function processPhotoSource(
     replaceTitle: input.replaceTitle,
     force: input.force,
     storedOriginal: input.storedOriginal,
+    scheduleBackgroundTask: input.scheduleBackgroundTask,
   });
 }
 
 export async function processInspectedPhotoSource(
   input: ProcessInspectedPhotoInput,
 ): Promise<ProcessPhotoSourceResult> {
+  const totalStartedAt = startTimer();
   const { inspection } = input;
   const title = resolvedPhotoTitle(inspection.originalFilename, input.title);
-  const location = await resolvePhotoLocation(inspection);
+  const location = embeddedPhotoLocation(inspection);
+  const prepareStartedAt = startTimer();
   const prepared = await preparePhotoRecord({
     inspection,
     location,
@@ -404,11 +556,46 @@ export async function processInspectedPhotoSource(
     force: input.force,
     reservedPhotoId: input.reservedPhotoId,
   });
+  logDuration(
+    "photo.process.stage",
+    {
+      photoId: prepared.photo.id,
+      filename: inspection.originalFilename,
+      stage: "prepare_record",
+      alreadyReady: prepared.alreadyReady,
+    },
+    prepareStartedAt,
+  );
 
   if (prepared.alreadyReady) {
+    const albumStartedAt = input.albumId ? startTimer() : null;
+
     if (input.albumId) {
       await linkPhotoToAlbum(input.albumId, prepared.photo.id);
     }
+
+    if (albumStartedAt !== null) {
+      logDuration(
+        "photo.process.stage",
+        {
+          photoId: prepared.photo.id,
+          filename: inspection.originalFilename,
+          stage: "link_album",
+        },
+        albumStartedAt,
+      );
+    }
+
+    schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
+    logDuration(
+      "photo.process.total",
+      {
+        photoId: prepared.photo.id,
+        filename: inspection.originalFilename,
+        status: "skipped",
+      },
+      totalStartedAt,
+    );
 
     return {
       status: "skipped",
@@ -418,16 +605,64 @@ export async function processInspectedPhotoSource(
   }
 
   try {
+    const generateStartedAt = startTimer();
     const generated = await generateAndUploadVariants(
       prepared.photo,
       inspection,
       input.storedOriginal,
     );
+    logDuration(
+      "photo.process.stage",
+      {
+        photoId: prepared.photo.id,
+        filename: inspection.originalFilename,
+        stage: "generate_and_upload",
+        variantCount: generated.variantCount,
+      },
+      generateStartedAt,
+    );
+
+    const readyStartedAt = startTimer();
     await markPhotoReady(prepared.photo.id, generated.blurhash);
+    logDuration(
+      "photo.process.stage",
+      {
+        photoId: prepared.photo.id,
+        filename: inspection.originalFilename,
+        stage: "mark_ready",
+      },
+      readyStartedAt,
+    );
+
+    const albumStartedAt = input.albumId ? startTimer() : null;
 
     if (input.albumId) {
       await linkPhotoToAlbum(input.albumId, prepared.photo.id);
     }
+
+    if (albumStartedAt !== null) {
+      logDuration(
+        "photo.process.stage",
+        {
+          photoId: prepared.photo.id,
+          filename: inspection.originalFilename,
+          stage: "link_album",
+        },
+        albumStartedAt,
+      );
+    }
+
+    schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
+    logDuration(
+      "photo.process.total",
+      {
+        photoId: prepared.photo.id,
+        filename: inspection.originalFilename,
+        status: "processed",
+        variantCount: generated.variantCount,
+      },
+      totalStartedAt,
+    );
 
     return {
       status: "processed",
@@ -436,6 +671,17 @@ export async function processInspectedPhotoSource(
     };
   } catch (error) {
     await markPhotoFailed(prepared.photo.id, error);
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "photo.process.failed",
+        photoId: prepared.photo.id,
+        filename: inspection.originalFilename,
+        message: error instanceof Error ? error.message : String(error),
+        durationMs: Math.max(0, Math.round(performance.now() - totalStartedAt)),
+        timestamp: new Date().toISOString(),
+      }),
+    );
     throw error;
   }
 }
