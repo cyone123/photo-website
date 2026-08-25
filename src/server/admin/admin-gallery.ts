@@ -27,10 +27,14 @@ export interface AdminAlbumPhoto {
   id: string;
   status: PhotoStatus;
   title: string | null;
+  description: string | null;
+  takenAt: Date | null;
   width: number;
   height: number;
   previewUrl: string | null;
   sortOrder: number;
+  chapterTitle: string | null;
+  chapterText: string | null;
 }
 
 export interface AdminAlbumDetail extends AdminStatusCounts {
@@ -197,10 +201,14 @@ export async function getAdminAlbumById(id: string): Promise<AdminAlbumDetail | 
         id: entry.photo.id,
         status: entry.photo.status,
         title: entry.photo.title,
+        description: entry.photo.description,
+        takenAt: entry.photo.takenAt,
         width: entry.photo.width,
         height: entry.photo.height,
         previewUrl: previewUrl(entry.photo.variants),
         sortOrder: entry.sortOrder,
+        chapterTitle: entry.chapterTitle,
+        chapterText: entry.chapterText,
       },
     ];
   });

@@ -4,6 +4,11 @@ export interface AdminActionState {
   fieldErrors?: Record<string, string[]>;
 }
 
+export interface AdminMutationState extends AdminActionState {
+  coverPhotoId?: string | null;
+  albumStatus?: "DRAFT" | "PUBLISHED";
+}
+
 export const INITIAL_ADMIN_ACTION_STATE: AdminActionState = {
   status: "idle",
   message: "",

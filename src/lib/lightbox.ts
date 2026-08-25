@@ -1,23 +1,6 @@
 import type { LightboxPhoto } from "@/components/photo-lightbox-types";
-import type { GalleryDate, GalleryPhoto } from "@/lib/gallery";
-
-function formatPhotoDate(value: GalleryDate) {
-  if (!value) {
-    return "未记录日期";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "未记录日期";
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
+import type { GalleryPhoto } from "@/lib/gallery";
+import { formatPhotoDate } from "@/lib/photo-date";
 
 export function toLightboxPhoto(photo: GalleryPhoto): LightboxPhoto {
   const sources = photo.variants

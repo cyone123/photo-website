@@ -5,16 +5,22 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { AdminActionState } from "@/components/admin/admin-action-state";
+import type { AdminActionState, AdminMutationState } from "@/components/admin/admin-action-state";
 import { GALLERY_CACHE_TAG } from "@/lib/gallery";
 import {
   AlbumServiceError,
   albumFieldsSchema,
+  clearAlbumChapter,
   createAlbum,
+  removePhotoFromAlbum,
   publishAlbum,
+  saveAlbumPhotoOrder,
   unpublishAlbum,
+  updateAlbumChapter,
+  updateAlbumCover,
   updateAlbumDetails,
 } from "@/server/admin/album-service";
+import { PhotoServiceError, updatePhoto } from "@/server/admin/photo-service";
 import { auth } from "@/server/auth/auth";
 import { requireAdmin } from "@/server/auth/session";
 
@@ -39,7 +45,7 @@ function albumFields(formData: FormData) {
 }
 
 function actionError(error: unknown, fallback: string): AdminActionState {
-  if (error instanceof AlbumServiceError) {
+  if (error instanceof AlbumServiceError || error instanceof PhotoServiceError) {
     return { status: "error", message: error.message };
   }
 
@@ -221,5 +227,111 @@ export async function unpublishAlbumAction(
     return { status: "success", message: "相册已转为草稿，公开缓存已刷新。" };
   } catch (error) {
     return actionError(error, "取消发布失败，请稍后重试。");
+  }
+}
+
+export async function saveAlbumPhotoOrderAction(
+  albumId: string,
+  input: string[] | { photoIds: string[] },
+): Promise<AdminActionState> {
+  await requireAdmin();
+
+  try {
+    await saveAlbumPhotoOrder(albumId, input);
+    refreshAdminAlbum(albumId);
+    refreshPublicGallery();
+    return { status: "success", message: "照片顺序已保存。" };
+  } catch (error) {
+    return actionError(error, "保存照片顺序失败，请稍后重试。");
+  }
+}
+
+export async function updateAlbumCoverAction(input: {
+  albumId: string;
+  photoId: string;
+  coverFocalX?: number;
+  coverFocalY?: number;
+}): Promise<AdminActionState> {
+  await requireAdmin();
+
+  try {
+    await updateAlbumCover(input);
+    refreshAdminAlbum(input.albumId);
+    refreshPublicGallery();
+    return { status: "success", message: "封面和焦点已保存。" };
+  } catch (error) {
+    return actionError(error, "保存封面失败，请稍后重试。");
+  }
+}
+
+export async function updatePhotoAction(input: {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  takenAt?: string | null;
+}): Promise<AdminActionState> {
+  await requireAdmin();
+
+  try {
+    await updatePhoto(input);
+    refreshPublicGallery();
+    return { status: "success", message: "照片信息已保存。" };
+  } catch (error) {
+    return actionError(error, "保存照片信息失败，请稍后重试。");
+  }
+}
+
+export async function updateAlbumChapterAction(input: {
+  albumId: string;
+  photoId: string;
+  title?: string | null;
+  text?: string | null;
+}): Promise<AdminActionState> {
+  await requireAdmin();
+
+  try {
+    await updateAlbumChapter(input);
+    refreshAdminAlbum(input.albumId);
+    refreshPublicGallery();
+    return { status: "success", message: "章节内容已保存。" };
+  } catch (error) {
+    return actionError(error, "保存章节失败，请稍后重试。");
+  }
+}
+
+export async function clearAlbumChapterAction(
+  albumId: string,
+  photoId: string,
+): Promise<AdminActionState> {
+  await requireAdmin();
+
+  try {
+    await clearAlbumChapter(albumId, photoId);
+    refreshAdminAlbum(albumId);
+    refreshPublicGallery();
+    return { status: "success", message: "章节已清除。" };
+  } catch (error) {
+    return actionError(error, "清除章节失败，请稍后重试。");
+  }
+}
+
+export async function removeAlbumPhotoAction(
+  albumId: string,
+  photoId: string,
+): Promise<AdminMutationState> {
+  await requireAdmin();
+
+  try {
+    const result = await removePhotoFromAlbum(albumId, photoId);
+    refreshAdminAlbum(albumId);
+    refreshPublicGallery();
+    return {
+      status: "success",
+      message: result.deletedPhoto ? "照片已从相册移除并清理存储。" : "照片已从相册移除。",
+      coverPhotoId: result.coverPhotoId,
+      albumStatus: result.status,
+    };
+  } catch (error) {
+    return actionError(error, "移除照片失败，请稍后重试。");
   }
 }

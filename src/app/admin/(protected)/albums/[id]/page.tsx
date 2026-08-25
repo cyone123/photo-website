@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminAlbumPhotoEditor } from "@/components/admin/admin-album-photo-editor";
 import { AdminAlbumForm } from "@/components/admin/admin-album-form";
 import { AdminPublicationControls } from "@/components/admin/admin-publication-controls";
 import { albumHref } from "@/lib/routes";
@@ -111,34 +111,13 @@ export default async function EditAdminAlbumPage({ params }: { params: Promise<{
           </Link>
         </div>
         {album.photos.length > 0 ? (
-          <div className="admin-photo-grid">
-            {album.photos.map((photo, index) => (
-              <article className="admin-photo-tile" key={photo.id}>
-                <div
-                  className="admin-photo-preview"
-                  style={
-                    photo.previewUrl
-                      ? ({
-                          backgroundImage: `url("${photo.previewUrl}")`,
-                          aspectRatio: `${photo.width} / ${photo.height}`,
-                        } as CSSProperties)
-                      : ({ aspectRatio: `${photo.width} / ${photo.height}` } as CSSProperties)
-                  }
-                >
-                  {!photo.previewUrl ? <span>NO PREVIEW</span> : null}
-                  <i>{String(index + 1).padStart(2, "0")}</i>
-                </div>
-                <div>
-                  <strong>{photo.title ?? "未命名照片"}</strong>
-                  <span
-                    className={`admin-photo-status admin-photo-status-${photo.status.toLowerCase()}`}
-                  >
-                    {photo.status}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
+          <AdminAlbumPhotoEditor
+            albumId={album.id}
+            initialPhotos={album.photos}
+            initialCoverPhotoId={album.coverPhotoId}
+            initialCoverFocalX={album.coverFocalX}
+            initialCoverFocalY={album.coverFocalY}
+          />
         ) : (
           <div className="admin-inline-empty">
             <p>这个相册还没有照片。</p>

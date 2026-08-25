@@ -1,6 +1,5 @@
 import type { GalleryDate } from "@/lib/gallery";
-
-const PHOTO_TIME_ZONE = "Asia/Shanghai";
+import { PHOTO_TIME_ZONE, toPhotoDate } from "@/lib/photo-date";
 
 export type GalleryMonth = {
   key: string;
@@ -12,9 +11,9 @@ export function getGalleryMonth(value: GalleryDate): GalleryMonth {
     return { key: "undated", label: "日期未记录" };
   }
 
-  const date = value instanceof Date ? value : new Date(value);
+  const date = toPhotoDate(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date) {
     return { key: "undated", label: "日期未记录" };
   }
 

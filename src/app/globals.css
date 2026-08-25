@@ -2004,6 +2004,245 @@ h3 {
   white-space: nowrap;
 }
 
+.admin-photo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+  border-block: 1px solid var(--hairline-strong);
+  padding-block: 14px;
+}
+
+.admin-photo-toolbar p,
+.admin-cover-editor-head p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-cover-editor {
+  margin-bottom: 28px;
+  border: 1px solid var(--hairline-strong);
+  background: #080808;
+  padding: 20px;
+}
+
+.admin-cover-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.admin-cover-editor-head h3 {
+  margin-top: 6px;
+  color: var(--on-dark);
+  font-size: 18px;
+}
+
+.admin-cover-editor-head p {
+  max-width: 620px;
+  margin-top: 8px;
+}
+
+.admin-cover-previews {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+  align-items: end;
+}
+
+.admin-cover-preview-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-cover-canvas {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background-color: #181818;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.admin-cover-canvas:focus-visible {
+  border-color: var(--on-dark);
+  outline: 2px solid var(--m-blue);
+  outline-offset: 2px;
+}
+
+.admin-cover-canvas-desktop {
+  aspect-ratio: 21 / 8;
+}
+
+.admin-cover-canvas-mobile {
+  aspect-ratio: 4 / 5;
+}
+
+.admin-cover-canvas i {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.admin-cover-empty {
+  margin-bottom: 24px;
+}
+
+.admin-photo-editor-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-photo-editor-card {
+  min-width: 0;
+  border: 1px solid var(--hairline-strong);
+  background: #0a0a0a;
+  padding: 10px;
+  outline: 0;
+}
+
+.admin-photo-editor-card:focus-visible {
+  border-color: var(--on-dark);
+  outline: 2px solid var(--m-blue);
+  outline-offset: 2px;
+}
+
+.admin-photo-tile-dragging {
+  opacity: 0.5;
+}
+
+.admin-photo-editor-card .admin-photo-preview {
+  cursor: grab;
+}
+
+.admin-photo-editor-card .admin-photo-preview:active {
+  cursor: grabbing;
+}
+
+.admin-photo-preview b {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.72);
+  padding: 4px 6px;
+  color: var(--on-dark);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.admin-photo-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.admin-photo-card-head > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-photo-card-head strong {
+  min-width: 0;
+}
+
+.admin-photo-drag-hint {
+  flex: none;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.admin-photo-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.admin-photo-card-actions .admin-button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.admin-photo-card-actions .admin-button-danger {
+  margin-left: auto;
+}
+
+.admin-photo-editor-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--hairline-strong);
+  padding-top: 10px;
+}
+
+.admin-photo-editor-links button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--body-strong);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-photo-edit-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--hairline-strong);
+  padding-top: 14px;
+}
+
+.admin-photo-edit-form .admin-field {
+  gap: 6px;
+}
+
+.admin-photo-edit-form .admin-field > span {
+  font-size: 11px;
+}
+
+.admin-photo-edit-form .admin-field input,
+.admin-photo-edit-form .admin-field textarea {
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.admin-photo-edit-form .admin-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 11px;
+}
+
+.admin-photo-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .admin-inline-empty {
   border: 1px dashed var(--hairline);
   padding: 36px;
@@ -2456,6 +2695,16 @@ h3 {
   .admin-title-line {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .admin-photo-toolbar,
+  .admin-cover-editor-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-cover-previews {
+    grid-template-columns: 1fr;
   }
 
   .admin-panel,

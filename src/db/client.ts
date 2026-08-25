@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import * as schema from "./schema";
 
 function createDatabase() {
@@ -9,7 +9,16 @@ function createDatabase() {
     throw new Error("DATABASE_URL is required to connect to PostgreSQL.");
   }
 
-  return drizzle(neon(databaseUrl), { schema });
+  // The editor performs multi-row updates that must be atomic. The HTTP
+  // driver cannot open interactive transactions, while the serverless pool
+  // supports Drizzle's transaction API and still works with Neon deployments.
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    max: 5,
+    allowExitOnIdle: true,
+  });
+
+  return drizzle(pool, { schema });
 }
 
 let database: ReturnType<typeof createDatabase> | undefined;

@@ -2,6 +2,10 @@ import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { readServerEnv } from "@/config/env";
 import { getDb } from "@/db/client";
+import {
+  formatPhotoDate as formatPhotoDateValue,
+  formatPhotoYear as formatPhotoYearValue,
+} from "@/lib/photo-date";
 import { albumPhotos, albums, photos } from "@/db/schema";
 
 export const GALLERY_CACHE_TAG = "gallery";
@@ -480,30 +484,10 @@ export function getPhotoById(id: string) {
   return getCachedPhotoById(id);
 }
 
-function asDate(value: GalleryDate) {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 export function formatPhotoDate(value: GalleryDate) {
-  const date = asDate(value);
-
-  if (!date) {
-    return "未记录日期";
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return formatPhotoDateValue(value);
 }
 
 export function formatPhotoYear(value: GalleryDate) {
-  const date = asDate(value);
-  return date ? new Intl.DateTimeFormat("zh-CN", { year: "numeric" }).format(date) : "—";
+  return formatPhotoYearValue(value);
 }

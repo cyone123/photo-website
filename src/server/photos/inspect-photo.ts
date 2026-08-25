@@ -58,7 +58,7 @@ function toJsonValue(value: unknown): JsonValue {
   }
 
   if (value instanceof Date) {
-    return value.toISOString();
+    return exifCalendarDate(value).toISOString();
   }
 
   if (Array.isArray(value)) {
@@ -82,6 +82,20 @@ function normalizeExif(value: ExifRecord) {
       .filter(([, nestedValue]) => nestedValue !== undefined)
       .map(([key, nestedValue]) => [key, toJsonValue(nestedValue)]),
   ) as Record<string, JsonValue>;
+}
+
+function exifCalendarDate(value: Date) {
+  return new Date(
+    Date.UTC(
+      value.getFullYear(),
+      value.getMonth(),
+      value.getDate(),
+      value.getHours(),
+      value.getMinutes(),
+      value.getSeconds(),
+      value.getMilliseconds(),
+    ),
+  );
 }
 
 function asNumber(value: unknown) {
@@ -165,7 +179,10 @@ function extractLocation(exif: ExifRecord) {
 
 function parseExifDate(value: unknown) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value;
+    // exifr revives timezone-less EXIF dates with `new Date(year, month, ...)`.
+    // Preserve the camera's calendar fields instead of the host timezone's
+    // instant (for example, 16:14 in UTC+8 must not become 08:14).
+    return exifCalendarDate(value);
   }
 
   if (typeof value !== "string") {
