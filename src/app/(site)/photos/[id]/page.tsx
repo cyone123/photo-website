@@ -9,9 +9,12 @@ import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { getAlbumBySlug, getPhotoById } from "@/lib/gallery";
 import { toLightboxPhoto } from "@/lib/lightbox";
 import { albumHref } from "@/lib/routes";
+import { mapHref, mapViewPages } from "@/lib/photo-map";
+import { z } from "zod";
 
 type PhotoPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; place?: string; view?: string }>;
 };
 
 export async function generateMetadata({ params }: PhotoPageProps): Promise<Metadata> {
@@ -24,8 +27,14 @@ export async function generateMetadata({ params }: PhotoPageProps): Promise<Meta
   };
 }
 
-export default async function PhotoPage({ params }: PhotoPageProps) {
+export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
   const { id } = await params;
+  const query = await searchParams;
+  const fromMap = query.from === "map";
+  const returnToMap = mapHref(
+    query.place && z.uuid().safeParse(query.place).success ? query.place : null,
+    mapViewPages(query.view),
+  );
   const photo = await getPhotoById(id);
 
   if (!photo) {
@@ -34,7 +43,7 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
 
   const parentAlbum = photo.albums[0];
   const camera = [photo.cameraMake, photo.cameraModel].filter(Boolean).join(" ");
-  const album = parentAlbum ? await getAlbumBySlug(parentAlbum.slug) : null;
+  const album = parentAlbum && !fromMap ? await getAlbumBySlug(parentAlbum.slug) : null;
   const viewerPhotos = album?.photos.length ? album.photos : [photo];
   const viewerIndex = Math.max(
     0,
@@ -71,7 +80,9 @@ export default async function PhotoPage({ params }: PhotoPageProps) {
             {photo.width} × {photo.height}
             {camera ? ` · ${camera}` : ""}
           </span>
-          {parentAlbum ? (
+          {fromMap ? (
+            <Link href={returnToMap}>返回拍摄足迹 →</Link>
+          ) : parentAlbum ? (
             <Link href={albumHref(parentAlbum.slug)}>返回 {parentAlbum.title} →</Link>
           ) : null}
         </figcaption>

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql, isNotNull } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { readServerEnv } from "@/config/env";
 import { getDb } from "@/db/client";
@@ -6,7 +6,22 @@ import {
   formatPhotoDate as formatPhotoDateValue,
   formatPhotoYear as formatPhotoYearValue,
 } from "@/lib/photo-date";
-import { albumPhotos, albums, photos } from "@/db/schema";
+import { albumPhotos, albums, photos, photoPlaces } from "@/db/schema";
+import type { MapPlace } from "@/lib/photo-map";
+
+// EXISTS avoids duplicate rows when a photo belongs to several published albums.
+// Keep inner aliases literal: relational findMany rewrites interpolated Columns to
+// its root alias. Only the correlated outer photos.id should be rewritten.
+function publicPhotoCondition() {
+  return and(
+    eq(photos.status, "READY"),
+    sql`exists (
+    select 1 from album_photos as public_membership
+    inner join albums as public_album on public_album.id = public_membership.album_id
+    where public_membership.photo_id = ${photos.id} and public_album.status = 'PUBLISHED'
+  )`,
+  );
+}
 
 export const GALLERY_CACHE_TAG = "gallery";
 export const ALBUM_PAGE_SIZE = 24;
@@ -426,7 +441,7 @@ export function getAlbumBySlug(slug: string) {
 
 async function queryLatestPhotos(limit: number) {
   return getDb().query.photos.findMany({
-    where: eq(photos.status, "READY"),
+    where: publicPhotoCondition(),
     orderBy: [desc(photos.takenAt), desc(photos.createdAt)],
     limit,
     with: {
@@ -440,7 +455,7 @@ const getCachedLatestPhotos = unstable_cache(
     const latest = await queryLatestPhotos(limit);
     return latest.map((photo) => toGalleryPhoto(photo as RawPhoto));
   },
-  ["latest-photos"],
+  ["latest-published-photos-v2"],
   GALLERY_CACHE_OPTIONS,
 );
 
@@ -451,7 +466,7 @@ export function getLatestPhotos(limit = 6) {
 const getCachedPhotoById = unstable_cache(
   async (id: string) => {
     const photo = await getDb().query.photos.findFirst({
-      where: and(eq(photos.id, id), eq(photos.status, "READY")),
+      where: and(eq(photos.id, id), publicPhotoCondition()),
       with: {
         variants: true,
         albumPhotos: {
@@ -476,7 +491,7 @@ const getCachedPhotoById = unstable_cache(
 
     return toGalleryPhoto(photo as RawPhoto, publishedAlbums);
   },
-  ["ready-photo-by-id"],
+  ["published-photo-by-id-v2"],
   GALLERY_CACHE_OPTIONS,
 );
 
@@ -491,3 +506,77 @@ export function formatPhotoDate(value: GalleryDate) {
 export function formatPhotoYear(value: GalleryDate) {
   return formatPhotoYearValue(value);
 }
+
+export interface MapPhotoPage {
+  photos: GalleryPhoto[];
+  total: number;
+  nextOffset: number | null;
+}
+
+export const getMapPlaces = unstable_cache(
+  async (): Promise<MapPlace[]> => {
+    if (!readServerEnv().DATABASE_URL) return [];
+    const rows = await getDb()
+      .select({
+        id: photoPlaces.id,
+        name: photoPlaces.name,
+        countryCode: photoPlaces.countryCode,
+        region: photoPlaces.region,
+        latitude: photoPlaces.latitude,
+        longitude: photoPlaces.longitude,
+        photoCount: count(photos.id).mapWith(Number),
+      })
+      .from(photoPlaces)
+      .innerJoin(photos, eq(photos.placeId, photoPlaces.id))
+      .where(publicPhotoCondition())
+      .groupBy(photoPlaces.id)
+      .orderBy(desc(count(photos.id)), asc(photoPlaces.name), asc(photoPlaces.id));
+    return rows.map((row) => ({
+      ...row,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+    }));
+  },
+  ["public-map-places-v1"],
+  GALLERY_CACHE_OPTIONS,
+);
+
+export const getMapPhotoPage = unstable_cache(
+  async (placeId: string | null, offset = 0, limit = 24): Promise<MapPhotoPage> => {
+    if (!readServerEnv().DATABASE_URL) return { photos: [], total: 0, nextOffset: null };
+    const db = getDb();
+    const condition = and(
+      publicPhotoCondition(),
+      isNotNull(photos.placeId),
+      placeId ? eq(photos.placeId, placeId) : undefined,
+    );
+    const [totals, entries] = await Promise.all([
+      db
+        .select({ value: count().mapWith(Number) })
+        .from(photos)
+        .where(condition),
+      db
+        .select({ id: photos.id })
+        .from(photos)
+        .where(condition)
+        .orderBy(sql`${photos.takenAt} desc nulls last`, desc(photos.createdAt), asc(photos.id))
+        .offset(offset)
+        .limit(limit + 1),
+    ]);
+    const ids = entries.slice(0, limit).map((entry) => entry.id);
+    const rows = ids.length
+      ? await db.query.photos.findMany({
+          where: and(inArray(photos.id, ids), publicPhotoCondition()),
+          with: { variants: true },
+        })
+      : [];
+    const byId = new Map(rows.map((photo) => [photo.id, toGalleryPhoto(photo)]));
+    return {
+      photos: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+      total: totals[0]?.value ?? 0,
+      nextOffset: entries.length > limit ? offset + limit : null,
+    };
+  },
+  ["public-map-photos-v1"],
+  GALLERY_CACHE_OPTIONS,
+);

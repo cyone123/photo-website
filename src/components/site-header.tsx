@@ -7,6 +7,7 @@ import { useState } from "react";
 const navigationItems = [
   { href: "/", label: "首页" },
   { href: "/albums", label: "相册" },
+  { href: "/map", label: "足迹" },
   { href: "/about", label: "关于" },
 ];
 

@@ -15,6 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "photo": "tsx src/cli/index.ts",
+    "photo:places": "tsx src/cli/backfill-places.ts",
     "admin:init": "tsx src/cli/create-admin.ts"
   },
   "engines": {
@@ -34,13 +35,16 @@
     "next": "^16.3.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-globe.gl": "^2.38.0",
     "sharp": "^0.35.3",
+    "three": "^0.186.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/three": "^0.186.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.1",

@@ -108,6 +108,22 @@ export const photoUploadStatusEnum = pgEnum("photo_upload_status", [
   "FAILED",
 ]);
 
+export const photoPlaces = pgTable(
+  "photo_places",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    countryCode: text("country_code").notNull(),
+    region: text("region"),
+    latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
+    source: text("source").notNull(),
+    sourceKey: text("source_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("photo_places_source_unique").on(table.source, table.sourceKey)],
+);
+
 export const photos = pgTable(
   "photos",
   {
@@ -130,6 +146,7 @@ export const photos = pgTable(
     longitude: numeric("longitude", { precision: 9, scale: 6 }),
     locationCity: text("location_city"),
     locationDistrict: text("location_district"),
+    placeId: uuid("place_id").references(() => photoPlaces.id, { onDelete: "set null" }),
     rawExif: jsonb("raw_exif").$type<Record<string, unknown>>(),
     title: text("title"),
     description: text("description"),
@@ -142,6 +159,7 @@ export const photos = pgTable(
     uniqueIndex("photos_content_hash_unique").on(table.contentHash),
     index("photos_status_idx").on(table.status),
     index("photos_taken_at_idx").on(table.takenAt),
+    index("photos_place_id_idx").on(table.placeId),
   ],
 );
 
@@ -201,6 +219,7 @@ export const albumPhotos = pgTable(
   (table) => [
     primaryKey({ columns: [table.albumId, table.photoId] }),
     index("album_photos_sort_order_idx").on(table.albumId, table.sortOrder),
+    index("album_photos_photo_id_idx").on(table.photoId),
   ],
 );
 

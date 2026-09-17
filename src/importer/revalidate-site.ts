@@ -1,7 +1,7 @@
-import { readImportEnv } from "@/config/env";
+import { readServerEnv } from "@/config/env";
 
 export async function revalidatePublishedGallery() {
-  const { REVALIDATE_SECRET, SITE_REVALIDATE_URL } = readImportEnv();
+  const { REVALIDATE_SECRET, SITE_REVALIDATE_URL } = readServerEnv();
 
   if (!REVALIDATE_SECRET || !SITE_REVALIDATE_URL) {
     return { status: "skipped" as const };

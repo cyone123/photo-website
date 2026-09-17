@@ -28,6 +28,7 @@ const serverEnvSchema = z.object({
   R2_PUBLIC_BASE_URL: optionalUrl,
   PHOTO_LOCATION_ENABLED: optionalBoolean,
   REVALIDATE_SECRET: optionalNonEmptyString,
+  SITE_REVALIDATE_URL: optionalUrl,
   BETTER_AUTH_SECRET: optionalNonEmptyString,
   BETTER_AUTH_URL: optionalUrl,
   ADMIN_EMAIL: z.preprocess((value) => (value === "" ? undefined : value), z.email().optional()),
@@ -40,7 +41,6 @@ const importEnvSchema = serverEnvSchema.extend({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_PUBLIC_BUCKET: z.string().min(1),
   R2_PRIVATE_BUCKET: z.string().min(1),
-  SITE_REVALIDATE_URL: optionalUrl,
 });
 
 const adminInitEnvSchema = serverEnvSchema.extend({

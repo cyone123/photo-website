@@ -8,15 +8,17 @@ export function PhotoCard({
   photo,
   index = 0,
   priority = false,
+  href,
 }: {
   photo: GalleryPhoto;
   index?: number;
   priority?: boolean;
+  href?: string;
 }) {
   return (
     <Link
       className="photo-card justified-photo-card"
-      href={`/photos/${photo.id}`}
+      href={href ?? `/photos/${photo.id}`}
       data-lightbox-index={index}
       style={
         {

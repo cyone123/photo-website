@@ -18,6 +18,7 @@ import {
 } from "./photo-location";
 import { PUBLIC_VARIANT_UPLOAD_CONCURRENCY } from "./variant-config";
 import { generatePhotoBlurhash, generatePublicVariants } from "./variants";
+import { assignPhotoPlace } from "./photo-place";
 
 type PhotoRecord = typeof photos.$inferSelect;
 type GeneratedVariants = Awaited<ReturnType<typeof generatePublicVariants>>;
@@ -118,6 +119,8 @@ async function enrichPhotoLocation(photo: PhotoRecord, inspection: InspectedPhot
         .where(eq(photos.id, photo.id));
     }
 
+    await assignPhotoPlace(photo);
+
     logDuration(
       "photo.process.stage",
       {
@@ -143,7 +146,7 @@ async function enrichPhotoLocation(photo: PhotoRecord, inspection: InspectedPhot
   }
 }
 
-function schedulePhotoLocationEnrichment(
+async function schedulePhotoLocationEnrichment(
   photo: PhotoRecord,
   inspection: InspectedPhotoBuffer,
   scheduleBackgroundTask?: BackgroundTaskScheduler,
@@ -151,7 +154,7 @@ function schedulePhotoLocationEnrichment(
   if (
     !isPhotoLocationEnabled() ||
     !hasPhotoCoordinates(inspection) ||
-    (photo.locationCity !== null && photo.locationDistrict !== null)
+    (photo.locationCity !== null && photo.locationDistrict !== null && photo.placeId !== null)
   ) {
     return;
   }
@@ -161,7 +164,7 @@ function schedulePhotoLocationEnrichment(
   if (scheduleBackgroundTask) {
     scheduleBackgroundTask(task);
   } else {
-    void task();
+    await task();
   }
 }
 
@@ -612,7 +615,7 @@ export async function processInspectedPhotoSource(
       );
     }
 
-    schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
+    await schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
     logDuration(
       "photo.process.total",
       {
@@ -678,7 +681,7 @@ export async function processInspectedPhotoSource(
       );
     }
 
-    schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
+    await schedulePhotoLocationEnrichment(prepared.photo, inspection, input.scheduleBackgroundTask);
     logDuration(
       "photo.process.total",
       {

@@ -36,6 +36,13 @@
       "when": 1787392937138,
       "tag": "0004_violet_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789655357102,
+      "tag": "0005_majestic_living_lightning",
+      "breakpoints": true
     }
   ]
 }

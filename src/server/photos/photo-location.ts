@@ -83,7 +83,7 @@ function locationFromAddress(address: JsonRecord): PhotoLocation {
   return { city, district };
 }
 
-async function waitForRateLimit() {
+export async function waitForLocationRateLimit() {
   const current = rateLimitTail.then(async () => {
     const waitMs = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now());
 
@@ -99,7 +99,7 @@ async function waitForRateLimit() {
 }
 
 async function fetchLocation(latitude: number, longitude: number): Promise<PhotoLocation> {
-  await waitForRateLimit();
+  await waitForLocationRateLimit();
 
   const url = new URL(NOMINATIM_REVERSE_URL);
   url.searchParams.set("lat", String(latitude));
