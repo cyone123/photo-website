@@ -9,9 +9,11 @@ import { MAP_PAGE_SIZE, MAP_MAX_VIEW_PAGES, mapHref } from "@/lib/photo-map";
 
 export function MapPhotoStream({
   placeId,
+  country,
   initialPage,
 }: {
   placeId: string | null;
+  country: string | null;
   initialPage: MapPhotoPage;
 }) {
   const [photos, setPhotos] = useState(initialPage.photos);
@@ -19,9 +21,15 @@ export function MapPhotoStream({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
-  const scrollKey = `map-scroll:${placeId ?? "all"}`;
+  const scrollKey = `map-scroll:${country ?? "all"}:${placeId ?? "all"}`;
   const view = Math.min(MAP_MAX_VIEW_PAGES, Math.max(1, Math.ceil(photos.length / MAP_PAGE_SIZE)));
-  const returnTo = mapHref(placeId, view);
+  const returnTo = mapHref(placeId, view, country);
+  const detailQuery = new URLSearchParams({
+    from: "map",
+    ...(country ? { country } : {}),
+    ...(placeId ? { place: placeId } : {}),
+    view: String(view),
+  });
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -60,6 +68,7 @@ export function MapPhotoStream({
       limit: String(MAP_PAGE_SIZE),
     });
     if (placeId) params.set("place", placeId);
+    if (country) params.set("country", country);
     try {
       const response = await fetch(`/api/map/photos?${params}`, { signal: controller.signal });
       if (!response.ok) throw new Error("照片载入失败");
@@ -74,7 +83,7 @@ export function MapPhotoStream({
         MAP_MAX_VIEW_PAGES,
         Math.ceil((nextOffset + page.photos.length) / MAP_PAGE_SIZE),
       );
-      window.history.replaceState(window.history.state, "", mapHref(placeId, loadedView));
+      window.history.replaceState(window.history.state, "", mapHref(placeId, loadedView, country));
     } catch {
       if (!controller.signal.aborted) setError(true);
     } finally {
@@ -83,7 +92,7 @@ export function MapPhotoStream({
         activeRequest.current = null;
       }
     }
-  }, [nextOffset, placeId]);
+  }, [nextOffset, placeId, country]);
 
   if (!photos.length)
     return (
@@ -99,7 +108,7 @@ export function MapPhotoStream({
         className="photo-grid photo-grid-justified"
         photos={photos.map((photo) => ({
           ...toLightboxPhoto(photo),
-          detailHref: `/photos/${photo.id}?from=map&${new URLSearchParams({ ...(placeId ? { place: placeId } : {}), view: String(view) })}`,
+          detailHref: `/photos/${photo.id}?${detailQuery}`,
         }))}
       >
         {photos.map((photo, index) => (
@@ -108,7 +117,7 @@ export function MapPhotoStream({
             photo={photo}
             index={index}
             priority={index < 3}
-            href={`/photos/${photo.id}?from=map&${new URLSearchParams({ ...(placeId ? { place: placeId } : {}), view: String(view) })}`}
+            href={`/photos/${photo.id}?${detailQuery}`}
           />
         ))}
       </PhotoLightboxGallery>

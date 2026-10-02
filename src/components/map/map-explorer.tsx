@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Component, useState, useTransition, type ReactNode } from "react";
-import { mapHref, placeLabel, type MapPlace } from "@/lib/photo-map";
+import { mapHref, placeLabel, countryName, mapCountries, type MapPlace } from "@/lib/photo-map";
 import type { MapPhotoPage } from "@/lib/gallery";
 import { MapPhotoStream } from "./map-photo-stream";
 
@@ -20,9 +20,7 @@ class GlobeBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() {
     return this.state.failed ? (
       <div className="map-globe map-globe-message">
-        此设备暂时无法显示 3D 地球。
-        <br />
-        你仍可使用地点列表浏览全部照片。
+        此设备暂时无法显示地球。你仍可使用列表浏览照片。
       </div>
     ) : (
       this.props.children
@@ -33,12 +31,14 @@ class GlobeBoundary extends Component<{ children: ReactNode }, { failed: boolean
 export function MapExplorer({
   places,
   selectedId,
+  country,
   initialPage,
   view,
   invalidPlace,
 }: {
   places: MapPlace[];
   selectedId: string | null;
+  country: string | null;
   initialPage: MapPhotoPage;
   view: number;
   invalidPlace: boolean;
@@ -47,48 +47,125 @@ export function MapExplorer({
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const selected = places.find((place) => place.id === selectedId);
-  const filtered = places.filter((place) =>
-    `${place.name} ${placeLabel(place)}`
-      .toLocaleLowerCase()
-      .includes(search.trim().toLocaleLowerCase()),
+  const countries = mapCountries(places);
+  const matches = (text: string) =>
+    text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+  const filtered = places.filter(
+    (place) =>
+      (!country || place.countryCode.toUpperCase() === country) &&
+      matches(`${place.name} ${placeLabel(place)} ${countryName(place.countryCode.toUpperCase())}`),
   );
-  const select = (id: string | null) => {
-    if (id === selectedId && !invalidPlace) return;
-    startTransition(() => router.push(mapHref(id), { scroll: false }));
+  const navigate = (id: string | null, code: string | null) => {
+    if (id === selectedId && code === country && !invalidPlace) return;
+    startTransition(() => router.push(mapHref(id, 1, code), { scroll: false }));
   };
+  const select = (id: string) => {
+    const place = places.find((entry) => entry.id === id);
+    if (place) navigate(id, place.countryCode.toUpperCase());
+  };
+  const selectCountry = (code: string) => navigate(null, code);
+  const title = invalidPlace
+    ? "地点暂不可用"
+    : (selected?.name ?? (country ? countryName(country) : "全部足迹"));
 
   return (
     <>
+      <nav className="map-breadcrumb" aria-label="足迹筛选路径">
+        <button
+          type="button"
+          onClick={() => navigate(null, null)}
+          aria-current={!country && !selected ? "page" : undefined}
+        >
+          全部足迹
+        </button>
+        {country && (
+          <>
+            <span aria-hidden="true">/</span>
+            <button
+              type="button"
+              onClick={() => selectCountry(country)}
+              aria-current={!selected ? "page" : undefined}
+            >
+              {countryName(country)}
+            </button>
+          </>
+        )}
+        {selected && (
+          <>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">{selected.name}</span>
+          </>
+        )}
+      </nav>
       <section className="map-explorer" aria-label="探索拍摄地点" aria-busy={pending}>
         <GlobeBoundary>
-          <PhotoGlobe places={places} selectedId={selectedId} onSelect={select} />
+          <PhotoGlobe
+            places={places}
+            selectedId={selectedId}
+            country={country}
+            onSelect={select}
+            onCountrySelect={selectCountry}
+          />
         </GlobeBoundary>
         <aside className="map-places">
           <div className="map-places-heading">
-            <span className="label">拍摄地点</span>
-            <span>{places.length.toLocaleString("zh-CN")}</span>
+            <span className="label">{country ? countryName(country) : "世界足迹"}</span>
+            <span>{filtered.length} 个地点</span>
           </div>
           <label className="map-search-label" htmlFor="map-search">
-            搜索地点
+            搜索国家 / 地点
           </label>
           <input
             id="map-search"
             type="search"
             className="map-search"
-            placeholder="搜索城市 / 地区"
+            placeholder="搜索国家、城市或地区"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
           <button
             type="button"
             className="map-place map-place-all"
-            aria-pressed={!selectedId && !invalidPlace}
-            onClick={() => select(null)}
+            aria-pressed={!country && !selectedId}
+            onClick={() => navigate(null, null)}
           >
             <span>全部足迹</span>
             <span>{places.reduce((sum, place) => sum + place.photoCount, 0)} 张</span>
           </button>
           <ul className="map-place-list">
+            {!country &&
+              countries
+                .filter((entry) => matches(`${entry.name} ${entry.code}`))
+                .map((entry) => (
+                  <li key={entry.code}>
+                    <button
+                      type="button"
+                      className="map-place map-country"
+                      onClick={() => selectCountry(entry.code)}
+                    >
+                      <span>
+                        <strong>{entry.name}</strong>
+                        <small>国家 / 地区 →</small>
+                      </span>
+                      <span>{entry.photoCount} 张</span>
+                    </button>
+                  </li>
+                ))}
+            {country && (
+              <li>
+                <button
+                  type="button"
+                  className="map-place map-country"
+                  aria-pressed={!selectedId}
+                  onClick={() => selectCountry(country)}
+                >
+                  <span>{countryName(country)}全部照片</span>
+                  <span>
+                    {countries.find((entry) => entry.code === country)?.photoCount ?? 0} 张
+                  </span>
+                </button>
+              </li>
+            )}
             {filtered.map((place) => (
               <li key={place.id}>
                 <button
@@ -108,19 +185,13 @@ export function MapExplorer({
           </ul>
           {!filtered.length && (
             <p className="map-place-empty">
-              {places.length
-                ? "没有找到匹配的拍摄地点。"
-                : "足迹会在带有位置的照片发布后出现在这里。"}
+              {search ? "没有找到匹配的拍摄地点。" : "这里还没有公开的拍摄足迹。"}
             </p>
           )}
         </aside>
       </section>
       <div className="map-attribution">
-        底图{" "}
-        <a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">
-          Natural Earth
-        </a>{" "}
-        · 地点 ©{" "}
+        拍摄地点 ©{" "}
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
           OpenStreetMap contributors
         </a>
@@ -130,29 +201,26 @@ export function MapExplorer({
           <div>
             <span className="label">Photo Archive</span>
             <h2>
-              {invalidPlace ? "地点暂不可用" : (selected?.name ?? "全部足迹")}
+              {title}
               <span>{initialPage.total.toLocaleString("zh-CN")} 张照片</span>
             </h2>
           </div>
-          {(selected || invalidPlace) && (
-            <button type="button" className="map-clear" onClick={() => select(null)}>
+          {(country || selected || invalidPlace) && (
+            <button type="button" className="map-clear" onClick={() => navigate(null, null)}>
               清除筛选 ↗
             </button>
           )}
         </header>
         <div className="map-selection-status" role="status">
-          {pending
-            ? "正在载入地点照片…"
-            : selected
-              ? `正在浏览${selected.name}的照片`
-              : "探索每一处留下影像的地方"}
+          {pending ? "正在载入照片…" : `正在浏览${title}`}
         </div>
         {invalidPlace ? (
-          <p className="map-place-empty">此地点不存在或暂无公开照片，请选择其他地点。</p>
+          <p className="map-place-empty">此筛选不存在或地点不属于所选国家，请选择其他地点。</p>
         ) : (
           <MapPhotoStream
-            key={`${selectedId ?? "all"}:${view}`}
+            key={`${country ?? "all"}:${selectedId ?? "all"}:${view}`}
             placeId={selectedId}
+            country={country}
             initialPage={initialPage}
           />
         )}

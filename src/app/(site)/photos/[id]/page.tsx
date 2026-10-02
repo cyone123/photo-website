@@ -9,12 +9,12 @@ import { ResponsivePhotoImage } from "@/components/responsive-photo-image";
 import { getAlbumBySlug, getPhotoById } from "@/lib/gallery";
 import { toLightboxPhoto } from "@/lib/lightbox";
 import { albumHref } from "@/lib/routes";
-import { mapHref, mapViewPages } from "@/lib/photo-map";
+import { mapHref, mapViewPages, normalizeCountry } from "@/lib/photo-map";
 import { z } from "zod";
 
 type PhotoPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; place?: string; view?: string }>;
+  searchParams: Promise<{ from?: string; place?: string; view?: string; country?: string }>;
 };
 
 export async function generateMetadata({ params }: PhotoPageProps): Promise<Metadata> {
@@ -34,6 +34,7 @@ export default async function PhotoPage({ params, searchParams }: PhotoPageProps
   const returnToMap = mapHref(
     query.place && z.uuid().safeParse(query.place).success ? query.place : null,
     mapViewPages(query.view),
+    normalizeCountry(query.country),
   );
   const photo = await getPhotoById(id);
 

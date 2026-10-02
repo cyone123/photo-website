@@ -542,13 +542,21 @@ export const getMapPlaces = unstable_cache(
 );
 
 export const getMapPhotoPage = unstable_cache(
-  async (placeId: string | null, offset = 0, limit = 24): Promise<MapPhotoPage> => {
+  async (
+    placeId: string | null,
+    offset = 0,
+    limit = 24,
+    country: string | null = null,
+  ): Promise<MapPhotoPage> => {
     if (!readServerEnv().DATABASE_URL) return { photos: [], total: 0, nextOffset: null };
     const db = getDb();
     const condition = and(
       publicPhotoCondition(),
       isNotNull(photos.placeId),
       placeId ? eq(photos.placeId, placeId) : undefined,
+      country
+        ? sql`exists (select 1 from photo_places as map_place where map_place.id = ${photos.placeId} and upper(map_place.country_code) = ${country.toUpperCase()})`
+        : undefined,
     );
     const [totals, entries] = await Promise.all([
       db
@@ -577,6 +585,6 @@ export const getMapPhotoPage = unstable_cache(
       nextOffset: entries.length > limit ? offset + limit : null,
     };
   },
-  ["public-map-photos-v1"],
+  ["public-map-photos-v2"],
   GALLERY_CACHE_OPTIONS,
 );
