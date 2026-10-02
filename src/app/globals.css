@@ -930,8 +930,16 @@ h3 {
   place-items: center;
   overflow: hidden;
   padding: 0 84px;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
+}
+
+.photo-lightbox-stage[data-zoomed] {
+  cursor: grab;
+}
+
+.photo-lightbox-stage[data-dragging] {
+  cursor: grabbing;
 }
 
 .photo-lightbox-stage > picture {
@@ -949,6 +957,11 @@ h3 {
   min-height: 0;
   object-fit: contain;
   object-position: center;
+  transition: transform 200ms cubic-bezier(0.22, 0.72, 0.22, 1);
+}
+
+.photo-lightbox-stage[data-interacting] > picture > img {
+  transition: none;
 }
 
 .photo-lightbox-picture-initial {

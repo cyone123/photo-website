@@ -1,9 +1,10 @@
 "use client";
 
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { LightboxPhoto } from "./photo-lightbox-types";
+import { PhotoLightboxImage } from "./photo-lightbox-image";
 
 type PhotoLightboxProps = {
   photos: LightboxPhoto[];
@@ -31,12 +32,10 @@ function CloseIcon() {
 
 function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightboxProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [transitionDirection, setTransitionDirection] =
     useState<LightboxTransitionDirection>("initial");
   const photo = activeIndex === null ? null : photos[activeIndex];
   const canNavigate = photos.length > 1;
-  const sourceSet = photo?.sources.map((source) => `${source.url} ${source.width}w`).join(", ");
 
   const close = useCallback(() => {
     setTransitionDirection("initial");
@@ -130,36 +129,6 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
     }
   }
 
-  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "touch") {
-      return;
-    }
-
-    touchStart.current = { x: event.clientX, y: event.clientY };
-  }
-
-  function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
-    const start = touchStart.current;
-    touchStart.current = null;
-
-    if (!start || event.pointerType !== "touch") {
-      return;
-    }
-
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
-
-    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-      return;
-    }
-
-    if (deltaX > 0) {
-      showPrevious();
-    } else {
-      showNext();
-    }
-  }
-
   return (
     <dialog
       ref={dialogRef}
@@ -197,35 +166,13 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
             </button>
           </header>
 
-          <div
-            className="photo-lightbox-stage"
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
+          <PhotoLightboxImage
+            key={photo.id}
+            photo={photo}
+            transitionDirection={transitionDirection}
+            onPrevious={showPrevious}
+            onNext={showNext}
           >
-            {photo.fallbackUrl ? (
-              <picture
-                key={photo.id}
-                className={`photo-lightbox-picture photo-lightbox-picture-${transitionDirection}`}
-              >
-                {sourceSet ? (
-                  <source
-                    type="image/avif"
-                    srcSet={sourceSet}
-                    sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
-                  />
-                ) : null}
-                <img
-                  src={photo.fallbackUrl}
-                  srcSet={sourceSet}
-                  sizes="(max-width: 640px) 100vw, calc(100vw - 168px)"
-                  alt={photo.title}
-                  decoding="async"
-                />
-              </picture>
-            ) : (
-              <div className="photo-lightbox-missing">暂无可用图片</div>
-            )}
-
             {canNavigate ? (
               <>
                 <button
@@ -246,7 +193,7 @@ function PhotoLightbox({ photos, activeIndex, onActiveIndexChange }: PhotoLightb
                 </button>
               </>
             ) : null}
-          </div>
+          </PhotoLightboxImage>
 
           <footer className="photo-lightbox-footer">
             <div className="photo-lightbox-meta">
