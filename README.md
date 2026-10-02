@@ -216,6 +216,16 @@ pnpm admin:init
 
 > **说明**：将提示您输入管理员密码（需满足 ≥12 位等安全规范）。邮箱缺省读取 `.env.local` 中的 `ADMIN_EMAIL`。
 
+忘记已有管理员密码时，在项目目录的交互式终端运行：
+
+```bash
+pnpm admin:reset-password --email admin@example.com
+```
+
+将邮箱替换为已有管理员邮箱；配置了 `ADMIN_EMAIL` 时可省略 `--email`。按提示隐藏输入两次新密码（12–128 位），成功后访问 `/admin/login` 登录。重置会注销该账号的现有会话；照片和相册不受影响。
+
+命令读取 `.env.local`（优先）和 `.env`，操作的是 `DATABASE_URL` 对应的数据库。如果本地与线上使用同一数据库，线上密码也会同时改变。已有账号不能通过再次运行 `admin:init` 重置密码。
+
 ### 6. 启动开发服务器
 
 ```bash

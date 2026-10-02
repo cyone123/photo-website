@@ -16,7 +16,8 @@
     "db:push": "drizzle-kit push",
     "photo": "tsx src/cli/index.ts",
     "photo:places": "tsx src/cli/backfill-places.ts",
-    "admin:init": "tsx src/cli/create-admin.ts"
+    "admin:init": "tsx src/cli/create-admin.ts",
+    "admin:reset-password": "tsx src/cli/reset-admin-password.ts"
   },
   "engines": {
     "node": ">=20.9.0"
