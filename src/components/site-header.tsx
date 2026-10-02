@@ -9,6 +9,7 @@ const navigationItems = [
   { href: "/albums", label: "相册" },
   { href: "/map", label: "足迹" },
   { href: "/about", label: "关于" },
+  { href: "/admin", label: "后台管理" },
 ];
 
 function isCurrentPath(pathname: string, href: string) {
@@ -55,6 +56,7 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={item.href === "/admin" ? false : undefined}
                 aria-current={current ? "page" : undefined}
                 onClick={() => setMenuOpen(false)}
               >

@@ -1196,6 +1196,7 @@ h3 {
 
 .site-footer-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
 }
 

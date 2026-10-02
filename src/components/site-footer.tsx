@@ -10,6 +10,9 @@ export function SiteFooter() {
           <Link href="/albums">相册</Link>
           <Link href="/map">足迹</Link>
           <Link href="/about">关于</Link>
+          <Link href="/admin" prefetch={false}>
+            后台管理
+          </Link>
         </nav>
       </div>
     </footer>

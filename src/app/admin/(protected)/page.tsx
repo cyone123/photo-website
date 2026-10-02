@@ -53,7 +53,7 @@ export default async function AdminDashboardPage() {
         </Link>
         <Link href="/admin/uploads">
           <strong>上传任务</strong>
-          <span>照片直传将在阶段 4 接入 →</span>
+          <span>上传照片或查看上传任务 →</span>
         </Link>
       </section>
     </div>
